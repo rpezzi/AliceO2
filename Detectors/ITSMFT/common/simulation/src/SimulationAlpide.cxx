@@ -22,7 +22,7 @@
 #include "ITSMFTBase/SegmentationPixel.h"
 #include "ITSMFTSimulation/SimulationAlpide.h"
 #include "ITSMFTSimulation/SimuClusterShaper.h"
-#include "ITSMFTSimulation/Point.h"
+#include "ITSMFTSimulation/Hit.h"
 #include "ITSMFTSimulation/DigitContainer.h"
 
 using namespace o2::ITSMFT;
@@ -133,7 +133,7 @@ void SimulationAlpide::addNoise(Double_t mean, const SegmentationPixel* seg, Dig
 
 //______________________________________________________________________
 void SimulationAlpide::generateClusters(const SegmentationPixel *seg, DigitContainer *digitContainer) {
-  Int_t nhits = Chip::GetNumberOfPoints();
+  Int_t nhits = Chip::GetNumberOfHits();
 
   // Add noise to the chip
   addNoise(mParam[Noise], seg, digitContainer);
@@ -148,7 +148,7 @@ void SimulationAlpide::generateClusters(const SegmentationPixel *seg, DigitConta
     Float_t y = y0 + 0.5*y1;
     Float_t z = z0 + 0.5*z1;
 
-    const Point *hit = Chip::GetPointAt(h);
+    const Hit *hit = Chip::GetHitAt(h);
     TLorentzVector trackP4;
     trackP4.SetPxPyPzE(hit->GetPx(), hit->GetPy(), hit->GetPz(), hit->GetTotalEnergy());
     Double_t beta = std::min(0.99999, trackP4.Beta());
