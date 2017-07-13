@@ -28,20 +28,22 @@ namespace o2 {
 namespace MFT {
 
 class HalfDisk : public TNamed {
-  
+
 public:
 
   HalfDisk();
   HalfDisk(HalfDiskSegmentation *segmentation);
 
   TGeoVolumeAssembly * createHeatExchanger();
+  TGeoVolumeAssembly * createSupport();
+
   void createLadders();
 
   ~HalfDisk() override;
-  
+
   /// \brief Returns a pointer to the Volume Assembly describing the entire half-disk
   TGeoVolumeAssembly * getVolume() {return mHalfDiskVolume;};
-  
+
 private:
 
   Support    * mSupport;             ///< \brief Disk Support
@@ -50,11 +52,10 @@ private:
   HalfDiskSegmentation * mSegmentation; ///< \brief Virtual Segmentation of the half-disk
 
   ClassDefOverride(HalfDisk, 1);
- 
+
 };
 
 }
 }
 
 #endif
-
