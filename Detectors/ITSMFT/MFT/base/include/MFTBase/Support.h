@@ -18,6 +18,15 @@
 #include "TNamed.h"
 #include "TGeoVolume.h"
 #include "TGeoMatrix.h"
+#include "TGeoBBox.h"
+#include "TGeoCompositeShape.h"
+#include "TGeoTube.h"
+#include "TGeoCone.h"
+#include "TGeoBoolNode.h"
+#include "TMath.h"
+#include "TGeoManager.h"
+#include "TGeoVolume.h"
+#include "FairLogger.h"
 
 namespace o2 {
 namespace MFT {
@@ -34,7 +43,11 @@ class Support : public TNamed {
 
   void initParameters();
   TGeoVolumeAssembly *mHalfDisk;
-  TGeoMedium *mSupportMedium;
+  TGeoMedium *mSupportMedium;  TGeoBBox *mSomeBox;
+  TGeoSubtraction *mSomeSubtraction;
+  TGeoUnion *mSomeUnion;
+  TGeoTranslation *mSomeTranslation;
+  TGeoCompositeShape *mSomeCS;
 
   Double_t mSupThickness; //Support Thickness
   Double_t mSupRad[5]; // Radius of each support disk
@@ -43,6 +56,11 @@ class Support : public TNamed {
   Double_t mPhi1;
   Double_t mT_delta; //Excess to remove to avoid coplanar surfaces that causes visualization glitches
   Double_t mRaisedBoxHeight;
+  Double_t mOuterCut[5]; //Distance of external disk cuts (oposite to beam pipe)
+  Int_t mNumberOfBoxCuts[5]; // Number of box cuts in each half disk support
+  Int_t mNumberOfRaixedBoxes[5]; //Number of Raised boxes in each halfDisk support
+
+
 
   ClassDefOverride(Support, 2);
 
