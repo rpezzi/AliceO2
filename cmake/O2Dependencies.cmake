@@ -334,6 +334,7 @@ o2_define_bucket(
     fairroot_base_bucket
     MathCore
     Geom
+    Gdml
     RIO
     Hist
     ParBase

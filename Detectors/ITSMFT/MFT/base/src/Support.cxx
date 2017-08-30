@@ -211,7 +211,17 @@ TGeoVolumeAssembly* Support::create(Int_t half, Int_t disk)
   // ======= Prepare support volume and add to HalfDisk =========
 
   auto *support_vol = new TGeoVolume(Form("Support_H%d_D%d",half,disk), mSomeCS, mSupportMedium);
-  mHalfDisk->AddNode(support_vol, 0);
+  //mHalfDisk->AddNode(support_vol, 0);
+
+  if (disk==0 && half==0) { // Adding test.gdml in place of support 0, half 0
+    TGDMLParse parser;
+    TGeoVolume* gdmlInput;
+    gdmlInput = parser.GDMLReadFile("test.gdml"); // test.gdml at current/working runtime directory
+    gdmlInput->SetMedium(mSupportMedium);
+    mHalfDisk->AddNode(gdmlInput,1);
+  }
+    else mHalfDisk->AddNode(support_vol, 0);
+
   return mHalfDisk;
 
 }

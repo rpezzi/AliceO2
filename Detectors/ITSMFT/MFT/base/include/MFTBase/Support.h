@@ -27,6 +27,7 @@
 #include "TGeoManager.h"
 #include "TGeoVolume.h"
 #include "FairLogger.h"
+#include "TGDMLParse.h"
 
 
 namespace o2 {
