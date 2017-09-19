@@ -22,6 +22,7 @@
 #include "TGeoCompositeShape.h"
 #include "TGeoTube.h"
 #include "TGeoCone.h"
+#include "TGeoArb8.h"
 #include "TGeoBoolNode.h"
 #include "TMath.h"
 #include "TGeoManager.h"
@@ -47,6 +48,7 @@ class Support : public TNamed {
   TGeoMedium *mSupportMedium;
   TGeoBBox *mSomeBox;
   TGeoTube *mSomeTube;
+  TGeoArb8 *mSomeArb;
 
   TGeoSubtraction *mSomeSubtraction;
   TGeoUnion *mSomeUnion;
@@ -61,6 +63,7 @@ class Support : public TNamed {
   Double_t mT_delta; //Excess to remove to avoid coplanar surfaces that causes visualization glitches
   Double_t mRaisedBoxHeight;
   Double_t mOuterCut[5]; //Distance of external disk cuts (oposite to beam pipe)
+                         // this is the y origin on Guillamet's PDF blueprints
 
   Int_t mNumberOfBoxCuts[5]; // Number of box cuts in each half disk support
   Double_t (*mBoxCuts[5])[4];// Box cuts on each disk
@@ -97,6 +100,7 @@ class Support : public TNamed {
   Double_t (*mD3Holes[5])[2]; // Positions of D8 mm holes on disk
 
   // ==== M3 H7 (?? mm diameter holes)
+  Int_t mNumberOfM3Holes[5]; // Number of M2 Holes in each halfDisk support
   Double_t mM3; // Radius   TODO: Verify this!
   Double_t (*mM3Holes[5])[2]; // Positions of M3 holes on disk
 

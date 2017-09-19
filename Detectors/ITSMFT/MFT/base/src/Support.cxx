@@ -27,12 +27,12 @@ Support::Support() :
 TNamed(),
 mHalfDisk(nullptr),
 mDiskGap(1.4),
-mSupRad{17.5,17.5,17.5,25.5,25.5},
+mSupRad{17.5,17.5,17.5,23.0,25.5},
 mSupThickness(.8),
 mPhi0(0.),
 mPhi1(180.),
 mT_delta(0.00001),
-mOuterCut{15.5,15.5,15.5,22.9,22.9},
+mOuterCut{15.5,15.5,16.7,20.5,22.9},
 mRaisedBoxHeight(0.305),
 mRad_M2(.156657/2.), // TODO: Check Radius of M2 holes
 mHeight_M2(.6/2), // Height of M2 holes on raised boxes
@@ -48,6 +48,8 @@ mD45(.45/2.), // Radius
 mD2(.2/2.), // Radius
 mHeight_D2(.4/2.)
 {
+  // Support dimentions obtained from Meriadeg Guillamet's blueprints
+  // from https://twiki.cern.ch/twiki/bin/viewauth/ALICE/MFTWP3
 
   initParameters();
 
@@ -178,7 +180,7 @@ TGeoVolumeAssembly* Support::create(Int_t half, Int_t disk)
   // ==== M3 H7 (?? mm diameter holes)
   //Info("Create",Form("Cutting M3 H7 holes Support_H%d_D%d", half,disk),0,0);
   mSomeTube = new TGeoTube(Form("M3tube_H%d_D%d", half, disk),0, mM3, mSupThickness/2.+2*mT_delta);
-  for(Int_t iHole=0 ; iHole<mTwoHoles; iHole++){
+  for(Int_t iHole=0 ; iHole<mNumberOfM3Holes[disk]; iHole++){
     mSomeTranslation = new TGeoTranslation(-mM3Holes[disk][iHole][0],
                                mOuterCut[disk]-mM3Holes[disk][iHole][1],
                                0.);
@@ -199,14 +201,58 @@ TGeoVolumeAssembly* Support::create(Int_t half, Int_t disk)
 
   // ==== D2 H7 - 4 mm deep (on lower surface)
   //Info("Create",Form("Cutting D2 holes Support_H%d_D%d", half,disk),0,0);
-  mSomeTube = new TGeoTube(Form("D2tube_H%d_D%d", half, disk),0, mD2, mSupThickness/2.+2*mT_delta);
+  mSomeTube = new TGeoTube(Form("D2tube_H%d_D%d", half, disk),0, mD2, .4/2.+2*mT_delta);
   for(Int_t iHole=0 ; iHole<mTwoHoles; iHole++){
     mSomeTranslation = new TGeoTranslation(-mD2Holes[disk][iHole][0],
                                mOuterCut[disk]-mD2Holes[disk][iHole][1],
-                               0.);
+                               mSupThickness/2.-.4/2);
     mSomeSubtraction = new TGeoSubtraction(mSomeCS, mSomeTube, NULL,mSomeTranslation);
     mSomeCS = new TGeoCompositeShape(NULL, mSomeSubtraction);
   }
+
+  // ======= Creating big holes =========
+
+  mSomeArb = new TGeoArb8("arb", mSupThickness);
+  mSomeArb->SetVertex(0,-21.377,mOuterCut[disk]-15.3);
+  mSomeArb->SetVertex(1,-20.075,mOuterCut[disk]-11.5);
+  mSomeArb->SetVertex(2,-17.0,mOuterCut[disk]-11.5);
+  mSomeArb->SetVertex(3,-17.0,mOuterCut[disk]-15.3);
+  mSomeArb->SetVertex(4,-21.377,mOuterCut[disk]-15.3);
+  mSomeArb->SetVertex(5,-20.075,mOuterCut[disk]-11.5);
+  mSomeArb->SetVertex(6,-17.0,mOuterCut[disk]-11.5);
+  mSomeArb->SetVertex(7,-17.0,mOuterCut[disk]-15.3);
+
+  mSomeSubtraction = new TGeoSubtraction(mSomeCS, mSomeArb, NULL,NULL);
+  mSomeCS = new TGeoCompositeShape(NULL, mSomeSubtraction);
+
+
+  mSomeArb = new TGeoArb8("arb", mSupThickness);
+  mSomeArb->SetVertex(0,-19.053,mOuterCut[disk]-9.5);
+  mSomeArb->SetVertex(1,-13.964,mOuterCut[disk]-3.5);
+  mSomeArb->SetVertex(2,-14.0,mOuterCut[disk]-7.5);
+  mSomeArb->SetVertex(3,-14.0,mOuterCut[disk]-9.5);
+  mSomeArb->SetVertex(4,-19.053,mOuterCut[disk]-9.5);
+  mSomeArb->SetVertex(5,-13.964,mOuterCut[disk]-3.5);
+  mSomeArb->SetVertex(6,-14.0,mOuterCut[disk]-7.5);
+  mSomeArb->SetVertex(7,-14.0,mOuterCut[disk]-9.5);
+
+  mSomeSubtraction = new TGeoSubtraction(mSomeCS, mSomeArb, NULL,NULL);
+  mSomeCS = new TGeoCompositeShape(NULL, mSomeSubtraction);
+
+
+  mSomeArb = new TGeoArb8("arb", mSupThickness);
+  mSomeArb->SetVertex(0,-13.964,mOuterCut[disk]-3.5);
+  mSomeArb->SetVertex(1,-10.0,mOuterCut[disk]-3.5);
+  mSomeArb->SetVertex(2,-10.0,mOuterCut[disk]-7.5);
+  mSomeArb->SetVertex(3,-14.0-2*mT_delta,mOuterCut[disk]-7.5);
+  mSomeArb->SetVertex(4,-13.964,mOuterCut[disk]-3.5);
+  mSomeArb->SetVertex(5,-10.0,mOuterCut[disk]-3.5);
+  mSomeArb->SetVertex(6,-10.0,mOuterCut[disk]-7.5);
+  mSomeArb->SetVertex(7,-14.0,mOuterCut[disk]-7.5);
+
+  mSomeSubtraction = new TGeoSubtraction(mSomeCS, mSomeArb, NULL,NULL);
+  mSomeCS = new TGeoCompositeShape(NULL, mSomeSubtraction);
+
 
   // ======= Prepare support volume and add to HalfDisk =========
 
@@ -263,19 +309,21 @@ void Support::initParameters()
   };
 
   // ### halfDisk 03
-  mNumberOfBoxCuts[3]=7;
+  mNumberOfBoxCuts[3]=8;
   mBoxCuts[03] = new Double_t[mNumberOfBoxCuts[3]][4]{
     {mSupRad[3]+mT_delta, mDiskGap, 0, 0},
     {sqrt(pow(mSupRad[3],2.)-pow(mOuterCut[3],2.)),
       (mSupRad[3]-mOuterCut[3])/2.,
       0.,
       (mSupRad[3]+mOuterCut[3])/2.}, //External cut width: 2*sqrt(R²-x²)
-    {12.4, 6.91, 0, 0},
-    {7.95, 9.4, 0, 0},
-    {2.9, 11.885, 0, 0},
-    {1.3875, 1.45, 16.1875, 7.9},
-    {1.3875, 1.45, -16.1875, 7.9}
+    {15.7, 9.4, 0, 0},
+    {9.7, 12.4, 0, 0},
+    {4.6, 14.73, 0, 0},
+    {2.9, 16.0 , 0 ,0},
+    {(mSupRad[3]-18.3)/2., 4.2,(mSupRad[3]+18.3)/2 , 0},
+    {(mSupRad[3]-18.3)/2., 4.2,-(mSupRad[3]+18.3)/2 , 0}
   };
+
 
   // ### halfDisk 04
   mNumberOfBoxCuts[4]=7;
@@ -320,13 +368,15 @@ void Support::initParameters()
   };
 
   // ### halfDisk 03
-  mNumberOfRaixedBoxes[3]=5;
+  mNumberOfRaixedBoxes[3]=7;
   mBRaised[03] = new Double_t[mNumberOfRaixedBoxes[3]][4]{
-    {(9.35-7.95)/2.,(8.81-6.91)/2.,(9.35+7.95)/2.,(8.81+6.91)/2.},
-    {(7.65-2.9)/2.,(11.82-9.4)/2.,(7.65+2.9)/2.,(11.82+9.4)/2.},
-    {(2.55+2.05)/2.,(13.92-11.885)/2.,(2.55-2.05)/2.,(13.92+11.885)/2.},
-    {(7.15-2.9)/2.,(11.82-9.4)/2.,(-7.152-2.92)/2.,(11.82+9.4)/2},
-    {(10.55-7.95)/2.,(8.81-6.91)/2.,(-10.55-7.95)/2.,(8.81+6.91)/2.}
+    {(12.75-9.7)/2.,(11.82-9.4)/2.,(12.75+9.7)/2.,(11.82+9.4)/2.},
+    {(9.35-4.6)/2.,(14.83-12.4)/2.,(9.35+4.6)/2.,(14.83+12.4)/2.},
+    {(4.25-2.9)/2.,(16.63-14.73)/2.,(4.25+2.9)/2.,(16.63+14.73)/2.},
+    {(2.55+2.05)/2.,(18.03-16.0)/2.,(2.55-2.05)/2.,(18.03+16.0)/2},
+    {(3.75-2.9)/2.,(17.09-14.73)/2.,-(3.75+2.9)/2.,(17.09+14.73)/2.},
+    {(8.85-4.6)/2.,(14.83-12.4)/2.,-(8.85+4.6)/2.,(14.83+12.4)/2.},
+    {(13.95-9.7)/2.,(11.82-9.4)/2.,-(13.95+9.7)/2.,(11.82+9.4)/2.}
   };
 
   // ### halfDisk 04
@@ -380,20 +430,24 @@ void Support::initParameters()
   };
 
   // ### halfDisk03
-  mNumberOfM2Holes[3]=12;
+  mNumberOfM2Holes[3]=16;
   mM2Holes[3] = new Double_t[mNumberOfM2Holes[3]][2] {
-    {-8.75, 7.29}, //
-    {-7.05, 4.275}, //
-    {-5.35, 4.275}, //
-    {-3.65, 4.275}, //
-    {-1.95, 2.429}, //
-    {-0.25, 2.175}, //
-    {1.45, 2.269}, //
-    {3.15, 4.275}, //
-    {4.85, 4.275}, //
-    {6.55, 4.275}, //
-    {8.25, 7.29}, //
-    {9.95, 7.29} //
+    {-12.15, 9.275}, // P
+    {-10.45, 9.275}, // R
+    {-8.75, 6.26},   // T
+    {-7.05, 6.26},   // V
+    {-5.35, 6.26},   // X
+    {-3.65, 4.46},  // Z
+    {-1.95, 3.225},  // BB
+    {-.25, 3.06},   // DD
+    {1.45, 3.12},   // FF
+    {3.15, 3.99},   // HH
+    {4.85, 6.62},   // JJ
+    {6.65, 6.62},   // LL
+    {8.25, 6.62},   // NN
+    {9.95, 9.275},   // PP
+    {11.65, 9.275},   // RR
+    {13.35, 9.275}    // TT
   };
 
   // ### halfDisk04
@@ -454,20 +508,24 @@ void Support::initParameters()
   };
 
   // ### halfDisk03
-  mNumberOfD2_hHoles[3] = 12;
+  mNumberOfD2_hHoles[3] = 16;
   mD2_hHoles[3] = new Double_t[mNumberOfD2_hHoles[3]][2]{
-    {-8.75, 7.29},  // #
-    {-7.05, 4.275}, // #
-    {-5.53, 4.275}, // #
-    {-3.65, 4.275}, // #
-    {-1.95, 2.429}, // #
-    {-0.25, 2.175}, // #
-    {1.45, 2.269},  // #
-    {3.15, 4.275},  // #
-    {4.85, 4.275},  // #
-    {6.55, 4.275},  // #
-    {8.25, 7.29},   // #
-    {9.95, 7.29}    // #
+    {-12.15, 10.075}, // O
+    {-10.45, 10.075}, // Q
+    {-8.75, 7.06},   // S
+    {-7.05, 7.06},   // T
+    {-5.35, 7.06},   // W
+    {-3.65, 5.26},  // Y
+    {-1.95, 4.025},  // AA
+    {-.25, 3.86},   // CC
+    {1.45, 3.92},   // EE
+    {3.15, 4.79},   // GG
+    {4.85, 7.06},   // II
+    {6.65, 7.06},   // KK
+    {8.25, 7.06},   // MM
+    {9.95, 10.075},   // OO
+    {11.65, 10.075},   // QQ
+    {13.35, 10.075}    // SS
   };
 
   // ### halfDisk04
@@ -506,8 +564,8 @@ void Support::initParameters()
 
   // ### halfDisk03
   mD65Holes[3] = new Double_t[mTwoHoles][2]{
-    {-16.6, 22.9}, // #
-    {16.6, 22.9}   // #
+    {-17.4, 18.5}, // # A
+    {17.4, 18.5}   // # B
   };
 
   // ### halfDisk02
@@ -536,8 +594,8 @@ void Support::initParameters()
 
   // ### halfDisk03
   mD6Holes[3] = new Double_t[mTwoHoles][2]{
-    {-16.6, 22.9}, // #
-    {16.6, 22.9} // #
+    {-17.4, 17.5}, // # C
+    {17.4, 17.5} // # D
   };
 
   // ### halfDisk04
@@ -594,8 +652,8 @@ void Support::initParameters()
 
   // ### halfDisk03
   mD3Holes[3] = new Double_t[mTwoHoles][2]{
-    {-16.6, 22.9}, // #
-    {16.6, 22.9} // #
+    {-19.5, 10.5}, // # E
+    {19.5, 10.5} // # F
   };
 
   // ### halfDisk04
@@ -607,28 +665,35 @@ void Support::initParameters()
   // ================================================
   // ## M3 H7 mm holes
   // ### halfDisk00
-  mM3Holes[0] = new Double_t[mTwoHoles][2]{
+  mNumberOfM3Holes[0]=2;
+  mM3Holes[0] = new Double_t[mNumberOfM3Holes[0]][2]{
     {-11.2, 6.0}, // #11
     {11.2, 6.0} // #12
   };
 
   // ### halfDisk01
+  mNumberOfM3Holes[1]=mNumberOfM3Holes[0];
   mM3Holes[1] = mM3Holes[0];
 
   // ### halfDisk02
-  mM3Holes[2] = new Double_t[mTwoHoles][2]{
+  mNumberOfM3Holes[2]=2;
+  mM3Holes[2] = new Double_t[mNumberOfM3Holes[2]][2]{
     {-12.0, 7.4}, // #7
     {12.0, 7.4} // #8
   };
 
   // ### halfDisk03
-  mM3Holes[3] = new Double_t[mTwoHoles][2]{
-    {-16.6, 22.9}, // #
-    {16.6, 22.9} // #
+  mNumberOfM3Holes[3]=4;
+  mM3Holes[3] = new Double_t[mNumberOfM3Holes[3]][2]{
+    {-16.5, 10.5}, // # G
+    {16.5, 10.5}, // # H
+    {-6.0, 2.5}, // # M
+    {6.0, 2.5} // # N
   };
 
   // ### halfDisk04
-  mM3Holes[4] = new Double_t[mTwoHoles][2]{
+  mNumberOfM3Holes[4]=2;
+  mM3Holes[4] = new Double_t[mNumberOfM3Holes[4]][2]{
     {-16.6, 22.9}, // #
     {16.6, 22.9} // #
   };
@@ -652,8 +717,8 @@ void Support::initParameters()
 
   // ### halfDisk03
   mD45Holes[3] = new Double_t[mTwoHoles][2]{
-    {-16.6, 22.9}, // #
-    {16.6, 22.9} // #
+    {-10., 1.5}, // # K
+    {10., 1.5} // # L
   };
 
   // ### halfDisk04
@@ -681,8 +746,8 @@ void Support::initParameters()
 
   // ### halfDisk03
   mD2Holes[3] = new Double_t[mTwoHoles][2]{
-    {-16.6, 22.9}, // #
-    {16.6, 22.9} // #
+    {-15.5, 10.805}, // # I
+    {15.5, 10.805} // # J
   };
 
   // ### halfDisk04
