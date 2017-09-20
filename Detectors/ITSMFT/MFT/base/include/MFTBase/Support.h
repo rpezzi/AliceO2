@@ -71,6 +71,9 @@ class Support : public TNamed {
   Int_t mNumberOfRaixedBoxes[5]; //Number of Raised boxes in each halfDisk support
   Double_t (*mBRaised[5])[4]; //Raised boxes for each halfDisk
 
+  Int_t mNumberOfVoids[5]; //Number of Voids (big holes) in each halfDisk support
+  Double_t (*mVoidVert[5])[8]; //Vertexes of Voids
+
   Int_t mNumberOfM2Holes[5]; // Number of M2 Holes in each halfDisk support
   Double_t (*mM2Holes[5])[2]; // M2 holes on halfdisk 00 and 01
   Double_t mRad_M2;

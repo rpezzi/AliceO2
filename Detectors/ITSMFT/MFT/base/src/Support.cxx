@@ -96,6 +96,28 @@ TGeoVolumeAssembly* Support::create(Int_t half, Int_t disk)
 
   // =================  Holes ==================
 
+
+  // ======= Creating big holes =========
+
+  Info("Create",Form("Cutting Voids Support_H%d_D%d", half,disk),0,0);
+  for(Int_t iVoid=0 ; iVoid<mNumberOfVoids[disk]; iVoid++){
+    mSomeArb = new TGeoArb8(Form("sc_void_H%d_D%d"), mSupThickness);
+    for(Int_t iVertex=0 ; iVertex<4 ; iVertex++){
+      mSomeArb->SetVertex(iVertex,mVoidVert[disk][iVoid][2*iVertex],mOuterCut[disk]+ mVoidVert[disk][iVoid][2*iVertex+1]);
+      Info("Create",Form("Cutting Void_%d Support_H%d_D%d Vertex%d: %f;%f",
+      iVoid, half, disk, iVertex, mVoidVert[disk][iVoid][2*iVertex],mVoidVert[disk][iVoid][2*iVertex+1]),0,0);
+    }
+      for(Int_t iVertex=0 ; iVertex<4 ; iVertex++){
+      mSomeArb->SetVertex(iVertex+4,mVoidVert[disk][iVoid][2*iVertex],mOuterCut[disk]+
+      mVoidVert[disk][iVoid][2*iVertex+1]);
+      Info("Create",Form("Cutting Void_%d Support_H%d_D%d Vertex%d: %f;%f",
+      iVoid, half, disk, iVertex+4, mVoidVert[disk][iVoid][2*iVertex],mVoidVert[disk][iVoid][2*iVertex+1]),0,0);
+    }
+    mSomeSubtraction = new TGeoSubtraction(mSomeCS, mSomeArb, NULL,NULL);
+    mSomeCS = new TGeoCompositeShape(NULL, mSomeSubtraction);
+    //For the backside
+  }
+
   // ==== M2 6mm deep holes)
   //Info("Create",Form("Cutting M2 6 mm deep holes Support_H%d_D%d", half,disk),0,0);
   mSomeTube = new TGeoTube(Form("sc_tube1_a_H%d_D%d", half, disk),0, mRad_M2, mHeight_M2+2.*mT_delta);
@@ -209,49 +231,6 @@ TGeoVolumeAssembly* Support::create(Int_t half, Int_t disk)
     mSomeSubtraction = new TGeoSubtraction(mSomeCS, mSomeTube, NULL,mSomeTranslation);
     mSomeCS = new TGeoCompositeShape(NULL, mSomeSubtraction);
   }
-
-  // ======= Creating big holes =========
-
-  mSomeArb = new TGeoArb8("arb", mSupThickness);
-  mSomeArb->SetVertex(0,-21.377,mOuterCut[disk]-15.3);
-  mSomeArb->SetVertex(1,-20.075,mOuterCut[disk]-11.5);
-  mSomeArb->SetVertex(2,-17.0,mOuterCut[disk]-11.5);
-  mSomeArb->SetVertex(3,-17.0,mOuterCut[disk]-15.3);
-  mSomeArb->SetVertex(4,-21.377,mOuterCut[disk]-15.3);
-  mSomeArb->SetVertex(5,-20.075,mOuterCut[disk]-11.5);
-  mSomeArb->SetVertex(6,-17.0,mOuterCut[disk]-11.5);
-  mSomeArb->SetVertex(7,-17.0,mOuterCut[disk]-15.3);
-
-  mSomeSubtraction = new TGeoSubtraction(mSomeCS, mSomeArb, NULL,NULL);
-  mSomeCS = new TGeoCompositeShape(NULL, mSomeSubtraction);
-
-
-  mSomeArb = new TGeoArb8("arb", mSupThickness);
-  mSomeArb->SetVertex(0,-19.053,mOuterCut[disk]-9.5);
-  mSomeArb->SetVertex(1,-13.964,mOuterCut[disk]-3.5);
-  mSomeArb->SetVertex(2,-14.0,mOuterCut[disk]-7.5);
-  mSomeArb->SetVertex(3,-14.0,mOuterCut[disk]-9.5);
-  mSomeArb->SetVertex(4,-19.053,mOuterCut[disk]-9.5);
-  mSomeArb->SetVertex(5,-13.964,mOuterCut[disk]-3.5);
-  mSomeArb->SetVertex(6,-14.0,mOuterCut[disk]-7.5);
-  mSomeArb->SetVertex(7,-14.0,mOuterCut[disk]-9.5);
-
-  mSomeSubtraction = new TGeoSubtraction(mSomeCS, mSomeArb, NULL,NULL);
-  mSomeCS = new TGeoCompositeShape(NULL, mSomeSubtraction);
-
-
-  mSomeArb = new TGeoArb8("arb", mSupThickness);
-  mSomeArb->SetVertex(0,-13.964,mOuterCut[disk]-3.5);
-  mSomeArb->SetVertex(1,-10.0,mOuterCut[disk]-3.5);
-  mSomeArb->SetVertex(2,-10.0,mOuterCut[disk]-7.5);
-  mSomeArb->SetVertex(3,-14.0-2*mT_delta,mOuterCut[disk]-7.5);
-  mSomeArb->SetVertex(4,-13.964,mOuterCut[disk]-3.5);
-  mSomeArb->SetVertex(5,-10.0,mOuterCut[disk]-3.5);
-  mSomeArb->SetVertex(6,-10.0,mOuterCut[disk]-7.5);
-  mSomeArb->SetVertex(7,-14.0,mOuterCut[disk]-7.5);
-
-  mSomeSubtraction = new TGeoSubtraction(mSomeCS, mSomeArb, NULL,NULL);
-  mSomeCS = new TGeoCompositeShape(NULL, mSomeSubtraction);
 
 
   // ======= Prepare support volume and add to HalfDisk =========
@@ -388,6 +367,23 @@ void Support::initParameters()
     {(7.15-2.9)/2.,(11.82-9.4)/2.,(-7.152-2.92)/2.,(11.82+9.4)/2},
     {(10.55-7.95)/2.,(8.81-6.91)/2.,(-10.55-7.95)/2.,(8.81+6.91)/2.}
   };
+
+  // ================================================
+  // ## Big holes (Voids)
+
+  mNumberOfVoids[0]=3; //Number of Voids (big holes) in each halfDisk support
+  mVoidVert[0]= new Double_t[mNumberOfVoids[0]][8]{
+    {-21.377,-15.3 ,-20.075 ,-11.5 ,-17.0,-11.5,-17.0,-15.3},
+    {-19.053,-9.5,-13.964,-3.5,-14.0,-7.5,-14.0,-9.5},
+    {-13.964 , -3.5,-14.0,-7.5 ,-14.0 ,-9.5 , -19.053,-9.5}
+  };
+
+
+  for(int i=1;i<=4;i++){
+   mNumberOfVoids[i] = mNumberOfVoids[0];
+   mVoidVert[i]  = mVoidVert[0];
+  }
+
 
   // ================================================
   // ## M2 6mm deep
