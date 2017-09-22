@@ -72,7 +72,7 @@ class Support : public TNamed {
   Double_t (*mBRaised[5])[4]; //Raised boxes for each halfDisk
 
   Int_t mNumberOfVoids[5]; //Number of Voids (big holes) in each halfDisk support
-  Double_t (*mVoidVert[5])[8]; //Vertexes of Voids
+  Double_t (*mVoidVert[5])[4][2]; //Vertexes of Voids
 
   Int_t mNumberOfM2Holes[5]; // Number of M2 Holes in each halfDisk support
   Double_t (*mM2Holes[5])[2]; // M2 holes on halfdisk 00 and 01
@@ -95,6 +95,7 @@ class Support : public TNamed {
   Double_t mD6; // Radius
 
   // ==== D8 H7 (8 mm diameter holes)
+  Int_t mNumberOfD8_Holes[5];
   Double_t mD8; // Radius
   Double_t (*mD8Holes[5])[2]; // Positions of D8 mm holes on disk
 
