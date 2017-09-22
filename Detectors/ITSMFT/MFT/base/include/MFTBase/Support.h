@@ -62,6 +62,7 @@ class Support : public TNamed {
   Double_t mPhi1;
   Double_t mT_delta; //Excess to remove to avoid coplanar surfaces that causes visualization glitches
   Double_t mRaisedBoxHeight;
+  Double_t mFixBoxHeight;
   Double_t mOuterCut[5]; //Distance of external disk cuts (oposite to beam pipe)
                          // this is the y origin on Guillamet's PDF blueprints
 
@@ -71,6 +72,9 @@ class Support : public TNamed {
   Int_t mNumberOfRaixedBoxes[5]; //Number of Raised boxes in each halfDisk support
   Double_t (*mBRaised[5])[4]; //Raised boxes for each halfDisk
 
+  Int_t mNumberOfFixBoxes[5]; //Number of Fixation boxes in each halfDisk support
+  Double_t (*mBFix[5])[5]; //Fixation boxes for each halfDisk
+  
   Int_t mNumberOfVoids[5]; //Number of Voids (big holes) in each halfDisk support
   Double_t (*mVoidVert[5])[4][2]; //Vertexes of Voids
 
