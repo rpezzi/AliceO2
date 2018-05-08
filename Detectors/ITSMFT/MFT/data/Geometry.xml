@@ -2,119 +2,119 @@
 <MFT>
   <half top="0"  ndisk="5" xpos="0" ypos="0" zpos="-46.">
     <disk   idisk="0" nladder="24" xpos="0." ypos="0." zpos="0." phi="0" theta="0" psi="0">
-        <ladder iladder="0" nsensor="2"  xpos="-9.51"  ypos="-0.16"   zpos="0.7" phi="0" theta="180" psi="90">
-            <chip ichip="0" xpos="-.04"   ypos="-.04"   zpos="0" phi="0" theta="0" psi="0"/>
-            <chip ichip="1" xpos="-.04"   ypos="-3.05"   zpos="0" phi="0" theta="0" psi="0"/>
+        <ladder iladder="0" nsensor="2"  xpos="0.16"  ypos="-9.51"   zpos="0.7" phi="0" theta="180" psi="90">
+            <chip ichip="0" xpos="-.04"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
+            <chip ichip="1" xpos="-3.05"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
           </ladder>
-        <ladder iladder="1" nsensor="3"  xpos="-7.81"  ypos="-0.16"   zpos="0.7" phi="0" theta="180" psi="90">
-            <chip ichip="0" xpos="-.04"   ypos="-.04"   zpos="0" phi="0" theta="0" psi="0"/>
-            <chip ichip="1" xpos="-.04"   ypos="-3.05"   zpos="0" phi="0" theta="0" psi="0"/>
-            <chip ichip="2" xpos="-.04"   ypos="-6.06"   zpos="0" phi="0" theta="0" psi="0"/>
+        <ladder iladder="1" nsensor="3"  xpos="0.16"  ypos="-7.81"   zpos="0.7" phi="0" theta="180" psi="90">
+            <chip ichip="0" xpos="-.04"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
+            <chip ichip="1" xpos="-3.05"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
+            <chip ichip="2" xpos="-6.06"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
           </ladder>
-        <ladder iladder="2" nsensor="3"  xpos="-6.11"  ypos="-0.16"   zpos="0.7" phi="0" theta="180" psi="90">
-            <chip ichip="0" xpos="-.04"   ypos="-.04"   zpos="0" phi="0" theta="0" psi="0"/>
-            <chip ichip="1" xpos="-.04"   ypos="-3.05"   zpos="0" phi="0" theta="0" psi="0"/>
-            <chip ichip="2" xpos="-.04"   ypos="-6.06"   zpos="0" phi="0" theta="0" psi="0"/>
+        <ladder iladder="2" nsensor="3"  xpos="0.16"  ypos="-6.11"   zpos="0.7" phi="0" theta="180" psi="90">
+            <chip ichip="0" xpos="-.04"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
+            <chip ichip="1" xpos="-3.05"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
+            <chip ichip="2" xpos="-6.06"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
           </ladder>
-        <ladder iladder="3" nsensor="3"  xpos="-4.41"  ypos="-0.16"   zpos="0.7" phi="0" theta="180" psi="90">
-            <chip ichip="0" xpos="-.04"   ypos="-.04"   zpos="0" phi="0" theta="0" psi="0"/>
-            <chip ichip="1" xpos="-.04"   ypos="-3.05"   zpos="0" phi="0" theta="0" psi="0"/>
-            <chip ichip="2" xpos="-.04"   ypos="-6.06"   zpos="0" phi="0" theta="0" psi="0"/>
+        <ladder iladder="3" nsensor="3"  xpos="0.16"  ypos="-4.41"   zpos="0.7" phi="0" theta="180" psi="90">
+            <chip ichip="0" xpos="-.04"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
+            <chip ichip="1" xpos="-3.05"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
+            <chip ichip="2" xpos="-6.06"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
           </ladder>
-        <ladder iladder="4" nsensor="3"  xpos="-2.71"  ypos="-2.01" zpos="0.7" phi="0" theta="180" psi="90">
-            <chip ichip="0" xpos="-.04"   ypos="-.04"   zpos="0" phi="0" theta="0" psi="0"/>
-            <chip ichip="1" xpos="-.04"   ypos="-3.05"   zpos="0" phi="0" theta="0" psi="0"/>
-            <chip ichip="2" xpos="-.04"   ypos="-6.06"   zpos="0" phi="0" theta="0" psi="0"/>
+        <ladder iladder="4" nsensor="3"  xpos="2.01"  ypos="-2.71" zpos="0.7" phi="0" theta="180" psi="90">
+            <chip ichip="0" xpos="-.04"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
+            <chip ichip="1" xpos="-3.05"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
+            <chip ichip="2" xpos="-6.06"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
           </ladder>
-        <ladder iladder="5" nsensor="3"  xpos="-1.01"  ypos="-2.26"  zpos="0.7" phi="0" theta="180" psi="90">
-            <chip ichip="0" xpos="-.04"   ypos="-.04"   zpos="0" phi="0" theta="0" psi="0"/>
-            <chip ichip="1" xpos="-.04"   ypos="-3.05"   zpos="0" phi="0" theta="0" psi="0"/>
-            <chip ichip="2" xpos="-.04"   ypos="-6.06"   zpos="0" phi="0" theta="0" psi="0"/>
+        <ladder iladder="5" nsensor="3"  xpos="2.26"  ypos="-1.01"  zpos="0.7" phi="0" theta="180" psi="90">
+            <chip ichip="0" xpos="-.04"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
+            <chip ichip="1" xpos="-3.05"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
+            <chip ichip="2" xpos="-6.06"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
           </ladder>
-        <ladder iladder="6" nsensor="3"  xpos="0.69"  ypos="-2.17" zpos="0.7" phi="0" theta="180" psi="90">
-            <chip ichip="0" xpos="-.04"   ypos="-.04"   zpos="0" phi="0" theta="0" psi="0"/>
-            <chip ichip="1" xpos="-.04"   ypos="-3.05"   zpos="0" phi="0" theta="0" psi="0"/>
-            <chip ichip="2" xpos="-.04"   ypos="-6.06"   zpos="0" phi="0" theta="0" psi="0"/>
+        <ladder iladder="6" nsensor="3"  xpos="2.17"  ypos="0.69" zpos="0.7" phi="0" theta="180" psi="90">
+            <chip ichip="0" xpos="-.04"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
+            <chip ichip="1" xpos="-3.05"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
+            <chip ichip="2" xpos="-6.06"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
           </ladder>
-        <ladder iladder="7" nsensor="3"  xpos="2.39" ypos="-0.16"    zpos="0.7" phi="0" theta="180" psi="90">
-            <chip ichip="0" xpos="-.04"   ypos="-.04"   zpos="0" phi="0" theta="0" psi="0"/>
-            <chip ichip="1" xpos="-.04"   ypos="-3.05"   zpos="0" phi="0" theta="0" psi="0"/>
-            <chip ichip="2" xpos="-.04"   ypos="-6.06"   zpos="0" phi="0" theta="0" psi="0"/>
+        <ladder iladder="7" nsensor="3"  xpos="0.16" ypos="2.39"    zpos="0.7" phi="0" theta="180" psi="90">
+            <chip ichip="0" xpos="-.04"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
+            <chip ichip="1" xpos="-3.05"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
+            <chip ichip="2" xpos="-6.06"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
           </ladder>
-        <ladder iladder="8" nsensor="3"  xpos="4.09" ypos="-0.16"    zpos="0.7" phi="0" theta="180" psi="90">
-            <chip ichip="0" xpos="-.04"   ypos="-.04"   zpos="0" phi="0" theta="0" psi="0"/>
-            <chip ichip="1" xpos="-.04"   ypos="-3.05"   zpos="0" phi="0" theta="0" psi="0"/>
-            <chip ichip="2" xpos="-.04"   ypos="-6.06"   zpos="0" phi="0" theta="0" psi="0"/>
+        <ladder iladder="8" nsensor="3"  xpos="0.16" ypos="4.09"    zpos="0.7" phi="0" theta="180" psi="90">
+            <chip ichip="0" xpos="-.04"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
+            <chip ichip="1" xpos="-3.05"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
+            <chip ichip="2" xpos="-6.06"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
           </ladder>
-        <ladder iladder="9" nsensor="3"  xpos="5.79" ypos="-0.16"    zpos="0.7" phi="0" theta="180" psi="90">
-            <chip ichip="0" xpos="-.04"   ypos="-.04"   zpos="0" phi="0" theta="0" psi="0"/>
-            <chip ichip="1" xpos="-.04"   ypos="-3.05"   zpos="0" phi="0" theta="0" psi="0"/>
-            <chip ichip="2" xpos="-.04"   ypos="-6.06"   zpos="0" phi="0" theta="0" psi="0"/>
+        <ladder iladder="9" nsensor="3"  xpos="0.16" ypos="5.79"    zpos="0.7" phi="0" theta="180" psi="90">
+            <chip ichip="0" xpos="-.04"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
+            <chip ichip="1" xpos="-3.05"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
+            <chip ichip="2" xpos="-6.06"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
           </ladder>
-        <ladder iladder="10" nsensor="2" xpos="7.49" ypos="-0.16"    zpos="0.7" phi="0" theta="180" psi="90">
-            <chip ichip="0" xpos="-.04"   ypos="-.04"   zpos="0" phi="0" theta="0" psi="0"/>
-            <chip ichip="1" xpos="-.04"   ypos="-3.05"   zpos="0" phi="0" theta="0" psi="0"/>
+        <ladder iladder="10" nsensor="2"  xpos="0.16" ypos="7.49"    zpos="0.7" phi="0" theta="180" psi="90">
+            <chip ichip="0" xpos="-.04"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
+            <chip ichip="1" xpos="-3.05"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
           </ladder>
-        <ladder iladder="11" nsensor="2" xpos="9.19" ypos="-0.16"    zpos="0.7" phi="0" theta="180" psi="90">
-            <chip ichip="0" xpos="-.04"   ypos="-.04"   zpos="0" phi="0" theta="0" psi="0"/>
-            <chip ichip="1" xpos="-.04"   ypos="-3.05"   zpos="0" phi="0" theta="0" psi="0"/>
+        <ladder iladder="11" nsensor="2"  xpos="0.16" ypos="9.19"    zpos="0.7" phi="0" theta="180" psi="90">
+            <chip ichip="0" xpos="-.04"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
+            <chip ichip="1" xpos="-3.05"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
           </ladder>
-        <ladder iladder="12" nsensor="2" xpos="9.59"  ypos="-.16"    zpos="-0.7" phi="0" theta="0" psi="-90">
-            <chip ichip="0" xpos="-.04"   ypos="-.04"   zpos="0" phi="0" theta="0" psi="0"/>
-            <chip ichip="1" xpos="-.04"   ypos="-3.05"   zpos="0" phi="0" theta="0" psi="0"/>
+        <ladder iladder="12" nsensor="2"  xpos="0.16"  ypos="9.59"    zpos="-0.7" phi="0" theta="0" psi="-90">
+            <chip ichip="0" xpos="-.04"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
+            <chip ichip="1" xpos="-3.05"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
           </ladder>
-        <ladder iladder="13" nsensor="2" xpos="7.89"  ypos="-0.16"    zpos="-0.7" phi="0" theta="0" psi="-90">
-            <chip ichip="0" xpos="-.04"   ypos="-.04"   zpos="0" phi="0" theta="0" psi="0"/>
-            <chip ichip="1" xpos="-.04"   ypos="-3.05"   zpos="0" phi="0" theta="0" psi="0"/>
+        <ladder iladder="13" nsensor="2"  xpos="0.16"  ypos="7.89"    zpos="-0.7" phi="0" theta="0" psi="-90">
+            <chip ichip="0" xpos="-.04"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
+            <chip ichip="1" xpos="-3.05"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
           </ladder>
-        <ladder iladder="14" nsensor="3" xpos="6.19"  ypos="-0.16"    zpos="-0.7" phi="0" theta="0" psi="-90">
-            <chip ichip="0" xpos="-.04"   ypos="-.04"   zpos="0" phi="0" theta="0" psi="0"/>
-            <chip ichip="1" xpos="-.04"   ypos="-3.05"   zpos="0" phi="0" theta="0" psi="0"/>
-            <chip ichip="2" xpos="-.04"   ypos="-6.06"   zpos="0" phi="0" theta="0" psi="0"/>
+        <ladder iladder="14" nsensor="3"  xpos="0.16"  ypos="6.19"    zpos="-0.7" phi="0" theta="0" psi="-90">
+            <chip ichip="0" xpos="-.04"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
+            <chip ichip="1" xpos="-3.05"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
+            <chip ichip="2" xpos="-6.06"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
           </ladder>
-        <ladder iladder="15" nsensor="3" xpos="4.49"  ypos="-0.16"    zpos="-0.7" phi="0" theta="0" psi="-90">
-            <chip ichip="0" xpos="-.04"   ypos="-.04"   zpos="0" phi="0" theta="0" psi="0"/>
-            <chip ichip="1" xpos="-.04"   ypos="-3.05"   zpos="0" phi="0" theta="0" psi="0"/>
-            <chip ichip="2" xpos="-.04"   ypos="-6.06"   zpos="0" phi="0" theta="0" psi="0"/>
+        <ladder iladder="15" nsensor="3"  xpos="0.16"  ypos="4.49"    zpos="-0.7" phi="0" theta="0" psi="-90">
+            <chip ichip="0" xpos="-.04"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
+            <chip ichip="1" xpos="-3.05"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
+            <chip ichip="2" xpos="-6.06"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
           </ladder>
-        <ladder iladder="16" nsensor="3" xpos="2.79"  ypos="-2.01"    zpos="-0.7" phi="0" theta="0" psi="-90">
-            <chip ichip="0" xpos="-.04"   ypos="-.04"   zpos="0" phi="0" theta="0" psi="0"/>
-            <chip ichip="1" xpos="-.04"   ypos="-3.05"   zpos="0" phi="0" theta="0" psi="0"/>
-            <chip ichip="2" xpos="-.04"   ypos="-6.06"   zpos="0" phi="0" theta="0" psi="0"/>
+        <ladder iladder="16" nsensor="3"  xpos="2.01"  ypos="2.79"    zpos="-0.7" phi="0" theta="0" psi="-90">
+            <chip ichip="0" xpos="-.04"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
+            <chip ichip="1" xpos="-3.05"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
+            <chip ichip="2" xpos="-6.06"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
           </ladder>
-        <ladder iladder="17" nsensor="3" xpos="1.09"   ypos="-2.26" zpos="-0.7" phi="0" theta="0" psi="-90">
-            <chip ichip="0" xpos="-.04"   ypos="-.04"   zpos="0" phi="0" theta="0" psi="0"/>
-            <chip ichip="1" xpos="-.04"   ypos="-3.05"   zpos="0" phi="0" theta="0" psi="0"/>
-            <chip ichip="2" xpos="-.04"   ypos="-6.06"   zpos="0" phi="0" theta="0" psi="0"/>
+        <ladder iladder="17" nsensor="3"  xpos="2.26"   ypos="1.09" zpos="-0.7" phi="0" theta="0" psi="-90">
+            <chip ichip="0" xpos="-.04"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
+            <chip ichip="1" xpos="-3.05"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
+            <chip ichip="2" xpos="-6.06"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
           </ladder>
-        <ladder iladder="18" nsensor="3" xpos="-.61" ypos="-2.17"  zpos="-0.7" phi="0" theta="0" psi="-90">
-            <chip ichip="0" xpos="-.04"   ypos="-.04"   zpos="0" phi="0" theta="0" psi="0"/>
-            <chip ichip="1" xpos="-.04"   ypos="-3.05"   zpos="0" phi="0" theta="0" psi="0"/>
-            <chip ichip="2" xpos="-.04"   ypos="-6.06"   zpos="0" phi="0" theta="0" psi="0"/>
+        <ladder iladder="18" nsensor="3"  xpos="2.17" ypos="-.61"  zpos="-0.7" phi="0" theta="0" psi="-90">
+            <chip ichip="0" xpos="-.04"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
+            <chip ichip="1" xpos="-3.05"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
+            <chip ichip="2" xpos="-6.06"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
           </ladder>
-        <ladder iladder="19" nsensor="3" xpos="-2.31" ypos="-.16" zpos="-0.7" phi="0" theta="0" psi="-90">
-            <chip ichip="0" xpos="-.04"   ypos="-.04"   zpos="0" phi="0" theta="0" psi="0"/>
-            <chip ichip="1" xpos="-.04"   ypos="-3.05"   zpos="0" phi="0" theta="0" psi="0"/>
-            <chip ichip="2" xpos="-.04"   ypos="-6.06"   zpos="0" phi="0" theta="0" psi="0"/>
+        <ladder iladder="19" nsensor="3"  xpos=".16" ypos="-2.31" zpos="-0.7" phi="0" theta="0" psi="-90">
+            <chip ichip="0" xpos="-.04"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
+            <chip ichip="1" xpos="-3.05"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
+            <chip ichip="2" xpos="-6.06"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
           </ladder>
-        <ladder iladder="20" nsensor="3" xpos="-4.01" ypos="-0.16"   zpos="-0.7" phi="0" theta="0" psi="-90">
-            <chip ichip="0" xpos="-.04"   ypos="-.04"   zpos="0" phi="0" theta="0" psi="0"/>
-            <chip ichip="1" xpos="-.04"   ypos="-3.05"   zpos="0" phi="0" theta="0" psi="0"/>
-            <chip ichip="2" xpos="-.04"   ypos="-6.06"   zpos="0" phi="0" theta="0" psi="0"/>
+        <ladder iladder="20" nsensor="3"  xpos="0.16" ypos="-4.01"   zpos="-0.7" phi="0" theta="0" psi="-90">
+            <chip ichip="0" xpos="-.04"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
+            <chip ichip="1" xpos="-3.05"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
+            <chip ichip="2" xpos="-6.06"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
           </ladder>
-        <ladder iladder="21" nsensor="3" xpos="-5.71" ypos="-0.16"   zpos="-0.7" phi="0" theta="0" psi="-90">
-            <chip ichip="0" xpos="-.04"   ypos="-.04"   zpos="0" phi="0" theta="0" psi="0"/>
-            <chip ichip="1" xpos="-.04"   ypos="-3.05"   zpos="0" phi="0" theta="0" psi="0"/>
-            <chip ichip="2" xpos="-.04"   ypos="-6.06"   zpos="0" phi="0" theta="0" psi="0"/>
+        <ladder iladder="21" nsensor="3"  xpos="0.16" ypos="-5.71"   zpos="-0.7" phi="0" theta="0" psi="-90">
+            <chip ichip="0" xpos="-.04"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
+            <chip ichip="1" xpos="-3.05"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
+            <chip ichip="2" xpos="-6.06"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
           </ladder>
-        <ladder iladder="22" nsensor="3" xpos="-7.41" ypos="-0.16"   zpos="-0.7" phi="0" theta="0" psi="-90">
-            <chip ichip="0" xpos="-.04"   ypos="-.04"   zpos="0" phi="0" theta="0" psi="0"/>
-            <chip ichip="1" xpos="-.04"   ypos="-3.05"   zpos="0" phi="0" theta="0" psi="0"/>
-            <chip ichip="2" xpos="-.04"   ypos="-6.06"   zpos="0" phi="0" theta="0" psi="0"/>
+        <ladder iladder="22" nsensor="3"  xpos="0.16" ypos="-7.41"   zpos="-0.7" phi="0" theta="0" psi="-90">
+            <chip ichip="0" xpos="-.04"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
+            <chip ichip="1" xpos="-3.05"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
+            <chip ichip="2" xpos="-6.06"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
           </ladder>
-        <ladder iladder="23" nsensor="2" xpos="-9.11" ypos="-0.16"   zpos="-0.7" phi="0" theta="0" psi="-90">
-            <chip ichip="0" xpos="-.04"   ypos="-.04"   zpos="0" phi="0" theta="0" psi="0"/>
-            <chip ichip="1" xpos="-.04"   ypos="-3.05"   zpos="0" phi="0" theta="0" psi="0"/>
+        <ladder iladder="23" nsensor="2"  xpos="0.16" ypos="-9.11"   zpos="-0.7" phi="0" theta="0" psi="-90">
+            <chip ichip="0" xpos="-.04"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
+            <chip ichip="1" xpos="-3.05"   ypos="0.04"   zpos="0" phi="0" theta="0" psi="0"/>
           </ladder>
     </disk>
     <disk   idisk="1" nladder="24" xpos="0." ypos="0." zpos="-3.3" phi="0" theta="0" psi="0">
