@@ -7,9 +7,9 @@
             <chip ichip="1" xpos="3.055" ypos="0.105"   zpos="0.0165" phi="0" theta="0" psi="0"/>
           </ladder>
         <ladder iladder="1"  nsensor="3"  xpos="-6.245"  ypos="-0.16"  zpos="0.7165"  phi="0" theta="180" psi="90">
-            <chip ichip="0" xpos="0.04"   ypos="0.04"   zpos=".05" phi="0" theta="0" psi="0"/>
-            <chip ichip="1" xpos="3.05"   ypos="0.04"   zpos="-.10" phi="0" theta="0" psi="0"/>
-            <chip ichip="2" xpos="6.06"   ypos="0.04"   zpos="-.15" phi="0" theta="0" psi="0"/>
+            <chip ichip="0" xpos="0.04"   ypos="0.105"   zpos="0.0165" phi="0" theta="0" psi="0"/>
+            <chip ichip="1" xpos="3.055"  ypos="0.105"   zpos="0.0165" phi="0" theta="0" psi="0"/>
+            <chip ichip="2" xpos="6.07"   ypos="0.105"   zpos="0.0165" phi="0" theta="0" psi="0"/>
           </ladder>
         <ladder iladder="2"  nsensor="3"  xpos="-4.545"  ypos="-0.16"  zpos="0.7165"  phi="0" theta="180" psi="90">
             <chip ichip="0" xpos="0.04"  ypos="0.105"   zpos="0.0165" phi="0" theta="0" psi="0"/>
@@ -123,9 +123,9 @@
           <chip ichip="1" xpos="3.055" ypos="0.105"   zpos="0.0165" phi="0" theta="0" psi="0"/>
         </ladder>
       <ladder iladder="1"  nsensor="3"  xpos="-6.245"  ypos="-0.16"  zpos="0.7165"  phi="0" theta="180" psi="90">
-          <chip ichip="0" xpos="0.04"   ypos="0.04"   zpos=".05" phi="0" theta="0" psi="0"/>
-          <chip ichip="1" xpos="3.05"   ypos="0.04"   zpos="-.10" phi="0" theta="0" psi="0"/>
-          <chip ichip="2" xpos="6.06"   ypos="0.04"   zpos="-.15" phi="0" theta="0" psi="0"/>
+          <chip ichip="0" xpos="0.04"   ypos="0.105"   zpos="0.0165" phi="0" theta="0" psi="0"/>
+          <chip ichip="1" xpos="3.055"  ypos="0.105"   zpos="0.0165" phi="0" theta="0" psi="0"/>
+          <chip ichip="2" xpos="6.07"   ypos="0.105"   zpos="0.0165" phi="0" theta="0" psi="0"/>
         </ladder>
       <ladder iladder="2"  nsensor="3"  xpos="-4.545"  ypos="-0.16"  zpos="0.7165"  phi="0" theta="180" psi="90">
           <chip ichip="0" xpos="0.04"  ypos="0.105"   zpos="0.0165" phi="0" theta="0" psi="0"/>
@@ -767,9 +767,9 @@
             <chip ichip="1" xpos="3.055" ypos="0.105"   zpos="0.0165" phi="0" theta="0" psi="0"/>
           </ladder>
         <ladder iladder="1"  nsensor="3"  xpos="-6.245"  ypos="-0.16"  zpos="0.7165"  phi="0" theta="180" psi="90">
-            <chip ichip="0" xpos="0.04"   ypos="0.04"   zpos=".05" phi="0" theta="0" psi="0"/>
-            <chip ichip="1" xpos="3.05"   ypos="0.04"   zpos="-.10" phi="0" theta="0" psi="0"/>
-            <chip ichip="2" xpos="6.06"   ypos="0.04"   zpos="-.15" phi="0" theta="0" psi="0"/>
+            <chip ichip="0" xpos="0.04"   ypos="0.105"   zpos="0.0165" phi="0" theta="0" psi="0"/>
+            <chip ichip="1" xpos="3.055"  ypos="0.105"   zpos="0.0165" phi="0" theta="0" psi="0"/>
+            <chip ichip="2" xpos="6.07"   ypos="0.105"   zpos="0.0165" phi="0" theta="0" psi="0"/>
           </ladder>
         <ladder iladder="2"  nsensor="3"  xpos="-4.545"  ypos="-0.16"  zpos="0.7165"  phi="0" theta="180" psi="90">
             <chip ichip="0" xpos="0.04"  ypos="0.105"   zpos="0.0165" phi="0" theta="0" psi="0"/>
@@ -883,9 +883,9 @@
           <chip ichip="1" xpos="3.055" ypos="0.105"   zpos="0.0165" phi="0" theta="0" psi="0"/>
         </ladder>
       <ladder iladder="1"  nsensor="3"  xpos="-6.245"  ypos="-0.16"  zpos="0.7165"  phi="0" theta="180" psi="90">
-          <chip ichip="0" xpos="0.04"   ypos="0.04"   zpos=".05" phi="0" theta="0" psi="0"/>
-          <chip ichip="1" xpos="3.05"   ypos="0.04"   zpos="-.10" phi="0" theta="0" psi="0"/>
-          <chip ichip="2" xpos="6.06"   ypos="0.04"   zpos="-.15" phi="0" theta="0" psi="0"/>
+          <chip ichip="0" xpos="0.04"   ypos="0.105"   zpos="0.0165" phi="0" theta="0" psi="0"/>
+          <chip ichip="1" xpos="3.055"  ypos="0.105"   zpos="0.0165" phi="0" theta="0" psi="0"/>
+          <chip ichip="2" xpos="6.07"   ypos="0.105"   zpos="0.0165" phi="0" theta="0" psi="0"/>
         </ladder>
       <ladder iladder="2"  nsensor="3"  xpos="-4.545"  ypos="-0.16"  zpos="0.7165"  phi="0" theta="180" psi="90">
           <chip ichip="0" xpos="0.04"  ypos="0.105"   zpos="0.0165" phi="0" theta="0" psi="0"/>
