@@ -17,5 +17,6 @@
 add_subdirectory(base)
 add_subdirectory(simulation)
 add_subdirectory(reconstruction)
+add_subdirectory(testwf)
 
 install(DIRECTORY data DESTINATION share/Detectors/Geometry/MFT/)
