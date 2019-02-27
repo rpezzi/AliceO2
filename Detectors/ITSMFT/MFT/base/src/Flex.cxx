@@ -93,13 +93,13 @@ TGeoVolumeAssembly* Flex::makeFlex(Int_t nbsensors, Double_t length)
   //-------------------------- Adding all layers of the FPC ----------------------------------
   //-----------------------------------------------------------------------------------------
 
-  flex->AddNode(varnishlayerIn, 1, new TGeoTranslation(0., 0., zvarnishIn)); // inside, in front of the cold plate
-  flex->AddNode(agnd_dgnd, 1, new TGeoTranslation(0., 0., zgnd));
-  flex->AddNode(kaptonlayer, 1, new TGeoTranslation(0., 0., zkaptonlayer));
-  flex->AddNode(lines, 1, new TGeoTranslation(0., 0., zlines));
-  flex->AddNode(varnishlayerOut, 1, new TGeoTranslation(0., 0., zvarnishOut)); // outside
+  //  flex->AddNode(varnishlayerIn, 1, new TGeoTranslation(0., 0., zvarnishIn)); // inside, in front of the cold plate
+  //  flex->AddNode(agnd_dgnd, 1, new TGeoTranslation(0., 0., zgnd));
+  //  flex->AddNode(kaptonlayer, 1, new TGeoTranslation(0., 0., zkaptonlayer));
+  //  flex->AddNode(lines, 1, new TGeoTranslation(0., 0., zlines));
+  //  flex->AddNode(varnishlayerOut, 1, new TGeoTranslation(0., 0., zvarnishOut)); // outside
 
-  makeElectricComponents(flex, nbsensors, length, zvarnishOut);
+  //  makeElectricComponents(flex, nbsensors, length, zvarnishOut);
 
   return flex;
 }
@@ -263,9 +263,9 @@ TGeoVolumeAssembly* Flex::makeElectricComponent(Double_t dx, Double_t dy, Double
   welding1->SetFillColor(welding1->GetLineColor());
   welding1->SetFillStyle(4000); // 0% transparent
 
-  X7R0402->AddNode(capacitor, 1, new TGeoTranslation(0., 0., 0.));
-  X7R0402->AddNode(welding0, 1, new TGeoTranslation(dx / 2 + (dx / 4) / 2, 0., (dz / 2) / 2));
-  X7R0402->AddNode(welding1, 1, new TGeoTranslation(-dx / 2 - (dx / 4) / 2, 0., (dz / 2) / 2));
+//  X7R0402->AddNode(capacitor, 1, new TGeoTranslation(0., 0., 0.));
+//  X7R0402->AddNode(welding0, 1, new TGeoTranslation(dx / 2 + (dx / 4) / 2, 0., (dz / 2) / 2));
+//  X7R0402->AddNode(welding1, 1, new TGeoTranslation(-dx / 2 - (dx / 4) / 2, 0., (dz / 2) / 2));
 
   X7R0402->SetVisibility(kTRUE);
 
