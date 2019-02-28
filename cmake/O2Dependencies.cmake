@@ -2416,12 +2416,16 @@ o2_define_bucket(
 
 
 o2_define_bucket(
-NAME
-mft_testwf_bucket
-DEPENDENCIES
-#
-Framework
-ITSMFTBase
-DataFormatsITSMFT
-INCLUDE_DIRECTORIES
+    NAME
+    mft_testwf_bucket
+
+    DEPENDENCIES
+    #
+    Framework
+    MFTBase
+    ITSMFTBase
+    ITSMFTReconstruction
+    DataFormatsITSMFT
+
+    INCLUDE_DIRECTORIES
 )

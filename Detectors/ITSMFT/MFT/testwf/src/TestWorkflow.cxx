@@ -13,6 +13,10 @@
 #include "MFTTestwf/TestWorkflow.h"
 
 #include "MFTTestwf/DigitReaderSpec.h"
+#include "MFTTestwf/DigitDigestSpec.h"
+#include "MFTTestwf/DigestWriterSpec.h"
+#include "MFTTestwf/ClustererSpec.h"
+#include "MFTTestwf/ClusterWriterSpec.h"
 
 namespace o2
 {
@@ -27,6 +31,10 @@ framework::WorkflowSpec getWorkflow()
   framework::WorkflowSpec specs;
 
   specs.emplace_back(o2::MFT::getDigitReaderSpec());
+  specs.emplace_back(o2::MFT::getDigitDigestSpec());
+  specs.emplace_back(o2::MFT::getDigestWriterSpec());
+  specs.emplace_back(o2::MFT::getClustererSpec());
+  specs.emplace_back(o2::MFT::getClusterWriterSpec());
 
   return specs;
 }
