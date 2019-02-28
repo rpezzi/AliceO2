@@ -5,6 +5,7 @@ O2_SETUP(NAME ${MODULE_NAME})
 
 set(SRCS
   src/TestWorkflow.cxx
+  src/DigitReaderSpec.cxx
    )
 
 set(LIBRARY_NAME ${MODULE_NAME})
