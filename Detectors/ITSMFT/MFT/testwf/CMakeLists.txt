@@ -8,6 +8,8 @@ set(SRCS
   src/DigitReaderSpec.cxx
   src/DigitDigestSpec.cxx
   src/DigestWriterSpec.cxx
+  src/ClustererSpec.cxx
+  src/ClusterWriterSpec.cxx
    )
 
 set(LIBRARY_NAME ${MODULE_NAME})

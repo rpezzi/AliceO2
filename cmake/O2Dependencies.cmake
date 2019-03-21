@@ -2474,7 +2474,9 @@ o2_define_bucket(
     DEPENDENCIES
     #
     Framework
+    MFTBase
     ITSMFTBase
+    ITSMFTReconstruction
     DataFormatsITSMFT
 
     INCLUDE_DIRECTORIES
