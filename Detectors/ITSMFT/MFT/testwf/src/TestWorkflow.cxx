@@ -13,6 +13,7 @@
 #include "MFTTestwf/TestWorkflow.h"
 
 #include "MFTTestwf/DigitReaderSpec.h"
+#include "MFTTestwf/DigitDigestSpec.h"
 
 namespace o2
 {
@@ -27,6 +28,7 @@ framework::WorkflowSpec getWorkflow()
   framework::WorkflowSpec specs;
 
   specs.emplace_back(o2::MFT::getDigitReaderSpec());
+  specs.emplace_back(o2::MFT::getDigitDigestSpec());
 
   return specs;
 }
