@@ -7,6 +7,7 @@ set(SRCS
   src/TestWorkflow.cxx
   src/DigitReaderSpec.cxx
   src/DigitDigestSpec.cxx
+  src/DigestWriterSpec.cxx
    )
 
 set(LIBRARY_NAME ${MODULE_NAME})
