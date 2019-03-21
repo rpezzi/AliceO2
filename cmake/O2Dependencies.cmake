@@ -2466,3 +2466,15 @@ o2_define_bucket(
     ${CMAKE_SOURCE_DIR}/Common/Field/include
     ${CMAKE_SOURCE_DIR}/Detectors/MUON/MCH/Base/include
 )
+
+o2_define_bucket(
+    NAME
+    mft_testwf_bucket
+
+    DEPENDENCIES
+    #
+    Framework
+
+    INCLUDE_DIRECTORIES
+)
+
