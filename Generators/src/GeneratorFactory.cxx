@@ -242,6 +242,19 @@ void GeneratorFactory::setPrimaryGenerator(o2::conf::SimConfig const& conf, Fair
         primGen->AddGenerator(boxGen);
       }
     }
+  } else if (genconfig.compare("boxgenzscan") == 0) { // box generator with z vertex scan
+    auto& boxparam = BoxGunParam::Instance();
+    for (auto z = -15; z < 16; z++) {
+        LOG(INFO) << "Init boxgenzscan generator with following parameters";
+        LOG(INFO) << boxparam;
+        auto boxGen = new FairBoxGenerator(boxparam.pdg, boxparam.number);
+        boxGen->SetEtaRange(boxparam.eta[0], boxparam.eta[1]);
+        boxGen->SetPRange(boxparam.prange[0], boxparam.prange[1]);
+        boxGen->SetPhiRange(boxparam.phirange[0], boxparam.phirange[1]);
+        boxGen->SetBoxXYZ(boxparam.vertexRange[0], boxparam.vertexRange[1], boxparam.vertexRange[2], boxparam.vertexRange[3], z);
+        boxGen->SetDebug(kTRUE);
+        primGen->AddGenerator(boxGen);
+    }
   } else {
     LOG(FATAL) << "Invalid generator";
   }
