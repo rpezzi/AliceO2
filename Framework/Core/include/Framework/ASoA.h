@@ -88,7 +88,7 @@ struct Flat {
 /// FIXME: the ChunkingPolicy for now is fixed to Flat and is a mere boolean
 /// which is used to switch off slow "chunking aware" parts. This is ok for
 /// now, but most likely we should move the whole chunk navigation logic there.
-template <typename T, typename ChunkingPolicy = Flat>
+template <typename T, typename ChunkingPolicy = Chunked>
 class ColumnIterator : ChunkingPolicy
 {
  public:
@@ -118,20 +118,22 @@ class ColumnIterator : ChunkingPolicy
   /// Move the iterator to the next chunk.
   void nextChunk() const
   {
-    mCurrentChunk++;
     auto chunks = mColumn->data();
+    auto previousArray = std::static_pointer_cast<arrow_array_for_t<T>>(chunks->chunk(mCurrentChunk));
+    mFirstIndex += previousArray->length();
+    mCurrentChunk++;
     auto array = std::static_pointer_cast<arrow_array_for_t<T>>(chunks->chunk(mCurrentChunk));
-    mFirstIndex += array->length();
     mCurrent = array->raw_values() - mFirstIndex;
     mLast = mCurrent + array->length() + mFirstIndex;
   }
 
-  void prevChunk()
+  void prevChunk() const
   {
-    mCurrentChunk--;
     auto chunks = mColumn->data();
+    auto previousArray = std::static_pointer_cast<arrow_array_for_t<T>>(chunks->chunk(mCurrentChunk));
+    mFirstIndex -= previousArray->length();
+    mCurrentChunk--;
     auto array = std::static_pointer_cast<arrow_array_for_t<T>>(chunks->chunk(mCurrentChunk));
-    mFirstIndex -= array->length();
     mCurrent = array->raw_values() - mFirstIndex;
     mLast = mCurrent + array->length() + mFirstIndex;
   }
@@ -164,7 +166,7 @@ class ColumnIterator : ChunkingPolicy
   T const& operator*() const
   {
     if constexpr (ChunkingPolicy::chunked) {
-      if (O2_BUILTIN_UNLIKELY(((mCurrent + *mCurrentPos) > mLast))) {
+      if (O2_BUILTIN_UNLIKELY(((mCurrent + *mCurrentPos) >= mLast))) {
         nextChunk();
       }
     }
@@ -176,7 +178,7 @@ class ColumnIterator : ChunkingPolicy
   {
     // If we get outside range of the current chunk, go to the next.
     if constexpr (ChunkingPolicy::chunked) {
-      while (O2_BUILTIN_UNLIKELY((mCurrent + *mCurrentPos) > mLast)) {
+      while (O2_BUILTIN_UNLIKELY((mCurrent + *mCurrentPos) >= mLast)) {
         nextChunk();
       }
     }
@@ -238,15 +240,12 @@ struct DynamicColumn {
 };
 
 template <typename T>
-using is_not_persistent_t = typename std::decay_t<T>::persistent::type;
-
-template <typename T>
-using is_persistent_t = std::is_same<typename std::decay_t<T>::persistent::type, std::false_type>;
+using is_persistent_t = typename std::decay_t<T>::persistent::type;
 
 template <typename... C>
 struct RowView : public C... {
  public:
-  using persistent_columns_t = framework::filtered_pack<is_not_persistent_t, C...>;
+  using persistent_columns_t = framework::selected_pack<is_persistent_t, C...>;
   using dynamic_columns_t = framework::filtered_pack<is_persistent_t, C...>;
 
   RowView(std::tuple<std::pair<C*, arrow::Column*>...> const& columnIndex, size_t numRows)
@@ -346,6 +345,7 @@ struct RowView : public C... {
   size_t mRowIndex = 0;
   size_t mMaxRow = 0;
   /// Helper to move to the correct chunk, if needed.
+  /// FIXME: not needed?
   template <typename... PC>
   void checkNextChunk(framework::pack<PC...> pack)
   {
@@ -384,6 +384,7 @@ struct RowView : public C... {
 
 struct ArrowHelpers {
   static std::shared_ptr<arrow::Table> joinTables(std::vector<std::shared_ptr<arrow::Table>>&& tables);
+  static std::shared_ptr<arrow::Table> concatTables(std::vector<std::shared_ptr<arrow::Table>>&& tables);
 };
 
 /// A Table class which observes an arrow::Table and provides
@@ -405,12 +406,6 @@ class Table
       mEnd(mColumnIndex, table->num_rows())
   {
     mEnd.moveToEnd();
-  }
-
-  template <typename... T>
-  Table(std::shared_ptr<arrow::Table> t1, std::shared_ptr<arrow::Table> t2, T... tables)
-    : Table(ArrowHelpers::joinTables({t1, t2, tables...}))
-  {
   }
 
   iterator begin()
@@ -480,7 +475,7 @@ struct FilterPersistentColumns {
 template <typename... C>
 struct FilterPersistentColumns<soa::Table<C...>> {
   using columns = typename soa::Table<C...>::columns;
-  using persistent_columns_pack = framework::filtered_pack<is_not_persistent_t, C...>;
+  using persistent_columns_pack = framework::selected_pack<is_persistent_t, C...>;
   using persistent_table_t = typename PackToTable<persistent_columns_pack>::table;
 };
 
@@ -618,25 +613,43 @@ class TableMetadata
 namespace o2::soa
 {
 
-namespace
-{
 template <typename... C1, typename... C2>
-constexpr auto joinTables(o2::soa::Table<C1...>&& t1, o2::soa::Table<C2...>&& t2)
+constexpr auto join(o2::soa::Table<C1...>&& t1, o2::soa::Table<C2...>&& t2)
 {
-  return o2::soa::Table<C1..., C2...>(t1.asArrowTable(), t2.asArrowTable());
+  return o2::soa::Table<C1..., C2...>(ArrowHelpers::joinTables({t1.asArrowTable(), t2.asArrowTable()}));
 }
-} // namespace
 
 template <typename T1, typename T2>
-using JoinBase = decltype(joinTables(std::declval<T1>(), std::declval<T2>()));
+constexpr auto concat(T1&& t1, T2&& t2)
+{
+  using table_t = typename PackToTable<framework::pack_intersect_t<typename T1::columns, typename T2::columns>>::table;
+  return table_t(ArrowHelpers::concatTables({t1.asArrowTable(), t2.asArrowTable()}));
+}
+
+template <typename T1, typename T2>
+using JoinBase = decltype(join(std::declval<T1>(), std::declval<T2>()));
+
+template <typename T1, typename T2>
+using ConcatBase = decltype(concat(std::declval<T1>(), std::declval<T2>()));
 
 template <typename T1, typename T2>
 struct Join : JoinBase<T1, T2> {
   Join(std::shared_ptr<arrow::Table> t1, std::shared_ptr<arrow::Table> t2)
-    : JoinBase<T1, T2>{t1, t2} {}
+    : JoinBase<T1, T2>{ArrowHelpers::joinTables({t1, t2})} {}
 
   using left_t = T1;
   using right_t = T2;
+  using table_t = JoinBase<T1, T2>;
+};
+
+template <typename T1, typename T2>
+struct Concat : ConcatBase<T1, T2> {
+  Concat(std::shared_ptr<arrow::Table> t1, std::shared_ptr<arrow::Table> t2)
+    : ConcatBase<T1, T2>{ArrowHelpers::concatTables({t1, t2})} {}
+
+  using left_t = T1;
+  using right_t = T2;
+  using table_t = ConcatBase<T1, T2>;
 };
 
 } // namespace o2::soa

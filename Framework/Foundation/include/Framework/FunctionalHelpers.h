@@ -71,6 +71,26 @@ constexpr auto concatenate_pack(pack<Args1...>, pack<Args2...>)
   return pack<Args1..., Args2...>{};
 }
 
+/// Selects from the pack types that satisfy the Condition
+template <template <typename> typename Condition, typename Result>
+constexpr auto select_pack(Result result, pack<>)
+{
+  return result;
+}
+
+template <template <typename> typename Condition, typename Result, typename T, typename... Ts>
+constexpr auto select_pack(Result result, pack<T, Ts...>)
+{
+  if constexpr (Condition<T>())
+    return select_pack<Condition>(concatenate_pack(result, pack<T>{}), pack<Ts...>{});
+  else
+    return select_pack<Condition>(result, pack<Ts...>{});
+}
+
+template <template <typename> typename Condition, typename... Types>
+using selected_pack = std::decay_t<decltype(select_pack<Condition>(pack<>{}, pack<Types...>{}))>;
+
+/// Removes from the pack types that satisfy the Condition
 template <template <typename> typename Condition, typename Result>
 constexpr auto filter_pack(Result result, pack<>)
 {
@@ -81,9 +101,9 @@ template <template <typename> typename Condition, typename Result, typename T, t
 constexpr auto filter_pack(Result result, pack<T, Ts...>)
 {
   if constexpr (Condition<T>())
-    return filter_pack<Condition>(concatenate_pack(result, pack<T>{}), pack<Ts...>{});
-  else
     return filter_pack<Condition>(result, pack<Ts...>{});
+  else
+    return filter_pack<Condition>(concatenate_pack(result, pack<T>{}), pack<Ts...>{});
 }
 
 template <template <typename> typename Condition, typename... Types>
@@ -99,6 +119,27 @@ struct has_type<T, pack<Us...>> : std::disjunction<std::is_same<T, Us>...> {
 
 template <typename T, typename... Us>
 inline constexpr bool has_type_v = has_type<T, Us...>::value;
+
+/// Intersect two packs
+template <typename S1, typename S2>
+struct pack_intersect {
+  template <std::size_t... Indices>
+  static constexpr auto make_intersection(std::index_sequence<Indices...>)
+  {
+
+    return concatenate_pack(
+      std::conditional_t<
+        has_type_v<
+          pack_element_t<Indices, S1>,
+          S2>,
+        pack<pack_element_t<Indices, S1>>,
+        pack<>>{}...);
+  }
+  using type = decltype(make_intersection(std::make_index_sequence<pack_size(S1{})>{}));
+};
+
+template <typename S1, typename S2>
+using pack_intersect_t = typename pack_intersect<S1, S2>::type;
 
 /// Type helper to hold metadata about a lambda or a class
 /// method.
