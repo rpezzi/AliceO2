@@ -67,7 +67,7 @@ void TrackFitterTask::run(ProcessingContext& pc)
     o2::mft::FitterTrackMFT& temptrack = fittertracks.emplace_back();
     convertTrack(track, temptrack, clusters);
     mTrackFitter->fit(temptrack, false);
-    LOG(INFO) << "tracksLTF: nTracksLTF  = " << nTracksLTF << " tracks.size() = " << fittertracks.size() << std::endl;
+    //LOG(INFO) << "tracksLTF: nTracksLTF  = " << nTracksLTF << " tracks.size() = " << fittertracks.size() << std::endl;
     nTracksLTF++;
   }
   // Fit CA tracks
@@ -76,7 +76,7 @@ void TrackFitterTask::run(ProcessingContext& pc)
     //o2::itsmft::Cluster& tempcluster = clusters.emplace_back();
     convertTrack(track, temptrack, clusters);
     mTrackFitter->fit(temptrack, false);
-    LOG(INFO) << "tracksCA: nTracksCA  = " << nTracksCA << " tracks.size() = " << fittertracks.size() << std::endl;
+    //LOG(INFO) << "tracksCA: nTracksCA  = " << nTracksCA << " tracks.size() = " << fittertracks.size() << std::endl;
     nTracksCA++;
   }
 
@@ -145,7 +145,7 @@ void convertTrack(const T& inTrack, O& outTrack, C& clusters)
   auto nClusters = inTrack.getNPoints();
   static int ntrack = 0;
 
-  std::cout << "** Converting MFT track with nClusters = " << nClusters << std::endl;
+  std::cout << "\n\n**** Converting MFT track with nClusters = " << nClusters << std::endl;
   // Add clusters to Tracker's cluster vector & set fittedTrack cluster range
   for (auto cls = 0; cls < nClusters; cls++) {
     o2::itsmft::Cluster& tempcluster = clusters.emplace_back(clusterIDs[cls], xpos[cls], ypos[cls], zpos[cls]);
@@ -156,9 +156,8 @@ void convertTrack(const T& inTrack, O& outTrack, C& clusters)
     std::cout << "Adding cluster " << cls << " to track " << ntrack << " with clusterID " << tempcluster.getSensorID() << " at z = " << tempcluster.getZ() << std::endl;
   }
 
-  std::cout << "  ** outTrack has getNClusters = " << outTrack.getNClusters() << std::endl;
-  for (auto par = outTrack.rbegin(); par != outTrack.rend(); par++)
-    std::cout << "     getZ() =  " << par->getZ() << std::endl;
+  //std::cout << "  ** outTrack has getNClusters = " << outTrack.getNClusters() << std::endl;
+  //for (auto par = outTrack.rbegin(); par != outTrack.rend(); par++) std::cout << "     getZ() =  " << par->getZ() << std::endl;
 
   //fit(outTrack, false);
 }

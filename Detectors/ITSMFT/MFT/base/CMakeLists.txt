@@ -28,6 +28,7 @@ o2_add_library(MFTBase
                        src/PowerSupplyUnit.cxx
                        src/Barrel.cxx
                PUBLIC_LINK_LIBRARIES O2::DetectorsBase O2::ITSMFTBase
+                                     ROOT::Minuit
                                      O2::ITSMFTSimulation ROOT::XMLIO)
 
 o2_target_root_dictionary(MFTBase

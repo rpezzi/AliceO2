@@ -14,18 +14,7 @@
 /// \author Philippe Pillot, Subatech; adapted by Rafael Pezzi, UFRGS
 
 #include "MFTTracking/TrackFitter.h"
-#include "MFTTracking/TrackCA.h"
-#include "DataFormatsMFT/TrackMFT.h"
-#include "DataFormatsITSMFT/Cluster.h"
-#include "ITSMFTReconstruction/ChipMappingMFT.h"
-#include <stdexcept>
-#include <TMath.h>
-#include <TMatrixD.h>
-#include <TF1.h>
-#include <TF2.h>
-#include "MathUtils/MathBase.h"
 
-using o2::math_utils::math_base::fitGaus;
 
 namespace o2
 {
@@ -140,7 +129,7 @@ void TrackFitter::addCluster(const TrackParam& startingParam, const o2::itsmft::
   if (cl.getZ() <= startingParam.getZ()) {
     throw std::runtime_error("The new cluster must be upstream");
   }
-  std::cout << "addCluster: add cluster at cl.getZ() = " << cl.getZ() << std::endl;
+  //std::cout << "addCluster: add cluster at cl.getZ() = " << cl.getZ() << std::endl;
   // copy the current parameters into the new ones
   param.setParameters(startingParam.getParameters());
   param.setZ(startingParam.getZ());
@@ -577,25 +566,230 @@ void addMCSEffect(TrackParam* trackParam, double dZ, double x0, bool isFieldON)
 }
 
 //__________________________________________________________________________
-Double_t momentumFromSagitta(FitterTrackMFT& track)
+Double_t momentumFromSagitta(FitterTrackMFT& track, Double_t bFieldZ)
 {
+  std::cout << "   Running momentumFromSagitta for track with nclusters = " << track.getNClusters()  << std::endl;
 
-  //TLinearFitter* lf = new TLinearFitter();
   auto nPoints = track.getNClusters();
   Double_t* x = new Double_t[nPoints];
   Double_t* y = new Double_t[nPoints];
+  TVectorD fitparam(3);
   int n = 0;
-  for (auto par = track.begin(); par != track.end(); par++) {
-    x[n] = par->getClusterPtr()->getX();
-    y[n] = par->getClusterPtr()->getY();
+  for (auto trackparam = track.begin(); trackparam != track.end(); trackparam++) {
+    x[n] = trackparam->getClusterPtr()->getX();
+    y[n] = trackparam->getClusterPtr()->getY();
+    std::cout << "    adding point to fit for z = " << trackparam->getClusterPtr()->getZ() << " (" << x[n] <<  "," << y[n]  <<  ") "<< std::endl;
     n++;
-    //std::cout << "   MomentumFromSagitta  par->getClusterPtr()->getX()  " << par->getClusterPtr()->getX() << std::endl;
   }
+  std::cout << "--------------------------------------------" << std::endl;
+  std::cout << " Fit QuadraticRegression: " << std::endl;
+  Double_t q0, q1, q2;
+  auto chi2 = QuadraticRegression(nPoints,x ,y, q0, q1,q2);
+  std::cout << " Fit Parameters [0] = " << q0 << " [1] =  " << q1 << " [2] = " << q2 << std::endl;
+  auto dz = track.last().getZ() - track.first().getZ();
+  auto slopeX = (track.last().getX() - track.first().getX()) / dz;
+  auto slopeY = (track.last().getY() - track.first().getY()) / dz;
+  std::cout << " Radius from QuadraticRegression = " << 0.5/q2 << std::endl;
+  auto pt = 0.3*bFieldZ*0.5/q2; // radius = 0.5/q2
+  auto p = pt*sqrt(1.0+1.0/(slopeX*slopeX+slopeY*slopeY));
+  std::cout << " Seed pt = " << pt << std::endl;
+  std::cout << " Seed momentum = " << p << std::endl;
+  std::cout << "--------------------------------------------" << std::endl;
+  std::cout << " Fit CircleRegression: " << std::endl;
+  Double_t radiusCirclereg = CircleRegression(nPoints,x ,y);
+  std::cout << " Radius from CircleRegression = " << radiusCirclereg << std::endl;
 
-  //lf->AssignData(nPoints, 2, x, y);
-  //lf->SetFormula("[0]*x + [1]*x + [2]*x**2");
+  std::cout << " Seed pt = " << 0.3*bFieldZ*radiusCirclereg << std::endl;
+  std::cout << " Seed momentum = " << radiusCirclereg*sqrt(1.0+1.0/(slopeX*slopeX+slopeY*slopeY)) << std::endl;
+  Double_t dist, qq;
+  std::cout << "--------------------------------------------" << std::endl;
+  std::cout << " Fit Sagitta: " << std::endl;
 
-  return 0.1;
+  Sagitta(nPoints,x ,y, dist, qq);
+  std::cout << "--------------------------------------------" << std::endl;
+
+
+  return p;
+
+}
+
+//__________________________________________________________________________
+Double_t Sagitta(Int_t nVal, Double_t *xVal, Double_t *yVal, Double_t &distL2, Double_t &q2, double bFieldZ)
+{
+	/// Calculate sagitta of the track
+	/// Return sagitta
+	std::cout << "Sagitta" << std::endl;
+	Double_t q0,q1,chi2;
+	// fit by a polynom of 2nd order
+	chi2 = QuadraticRegression(nVal,xVal ,yVal, q0, q1,q2);
+	std::cout << Form("q param = %f  %f  %f  chi2 = %e ",q0, q1,q2,chi2) << std::endl;
+	std::cout << Form("pt from 2nd order parameter %f ",0.01/q2/2.*0.3*bFieldZ/10.) << std::endl;
+
+
+	Double_t maxDist = 0.;
+	Int_t i1 = -1;
+	Int_t i2 = -1;
+	Double_t sagitta = 0.;
+	Double_t dist ;
+	Double_t distTot = 0.;
+
+	for (int i=0; i<nVal-1; i++) {
+		distTot += TMath::Sqrt((xVal[i]-xVal[i+1]) * (xVal[i]-xVal[i+1]) + (yVal[i]-yVal[i+1]) * (yVal[i]-yVal[i+1]));
+
+		for (int j = i+1; j<nVal; j++) {
+			Double_t dist = (xVal[i]-xVal[j]) * (xVal[i]-xVal[j]) + (yVal[i]-yVal[j]) * (yVal[i]-yVal[j]);
+			if(dist>maxDist){
+				i1 = i;
+				i2 = j;
+				maxDist = dist;
+			}
+		}
+	}
+
+	std::cout << Form("distMAx = %f distTot =%f   i1 = %d i2 =%d",TMath::Sqrt(maxDist),distTot,i1,i2) << std::endl;
+
+	distL2 = 1.e-2*TMath::Sqrt((xVal[i1]-xVal[i2]) * (xVal[i1]-xVal[i2]) + (yVal[i1]-yVal[i2]) * (yVal[i1]-yVal[i2]) );
+
+	Double_t p1 = (yVal[i1]-yVal[i2]) / (xVal[i1]-xVal[i2]);
+	Double_t p0 = yVal[i2] - xVal[i2] * p1;
+	std::cout << Form("p param = %f  %f  ",p0, p1) << std::endl;
+	q2 = TMath::Sign(q2,q1*q2*(-(p0 + p1 * (xVal[i1]+xVal[i2])/2.))*(bFieldZ));
+
+
+	Double_t y12 = q0+q1*xVal[i1]+q2*xVal[i1]*xVal[i1];
+	Double_t y22 = q0+q1*xVal[i2]+q2*xVal[i2]*xVal[i2];
+	std::cout << Form("x1, y1 %f  %f  ",xVal[i1], y12) << std::endl;
+	std::cout << Form("x2, y2 %f  %f  ",xVal[i2], y22) << std::endl;
+
+//	Double_t p12 = (y12-y22) / (xVal[i1]-xVal[i2]);
+//	Double_t p02 = y22 - xVal[i2] * p12;
+//	std::cout << Form("p2 param = %f  %f  ",p02, p12) << std::endl;
+
+	Double_t maxSagitta = 0.;
+	for (int i=0; i<20; i++) {
+		Double_t step =TMath::Abs(xVal[i1]-xVal[i2])/20.;
+		Double_t xmiddle = xVal[i1] + i*step;
+
+		Double_t y1 = p0 + p1 * xmiddle;
+		Double_t p1perp = -1./p1;
+		Double_t p0perp = p0 + xmiddle *(p1-p1perp);
+		//std::cout << Form("p param perp = %f  %f  ",p0perp, p1perp) << std::endl;
+
+		Double_t xmax = (p1perp - q1 + TMath::Sqrt(p1perp*p1perp - 2*p1perp*q1 + q1*q1 + 4*p0perp*q2 - 4*q0*q2))/(2*q2);
+		Double_t xmax2 = -(q1 -p1perp + TMath::Sqrt(p1perp*p1perp - 2*p1perp*q1 + q1*q1 + 4*p0perp*q2 - 4*q0*q2))/(2*q2);
+		//		std::cout << Form("xmax = %f   xmax2  %f",xmax,xmax2) << std::endl;
+
+		if (TMath::Abs(xmax2-xmiddle) < TMath::Abs(xmax-xmiddle)) xmax = xmax2;
+
+
+		Double_t y2 = q0 + q1 * xmax  + q2 * xmax * xmax;
+
+		sagitta = 1e-2*TMath::Sqrt((xmiddle-xmax) * (xmiddle-xmax) + (y1-y2) * (y1-y2) );
+
+		//		std::cout << Form("sagitta = %f   Bz = %f",sagitta,bFieldZ) << std::endl;
+
+		sagitta = TMath::Sign(sagitta,q1*q2*(-y1)*(bFieldZ));
+
+		if(TMath::Abs(sagitta)>TMath::Abs(maxSagitta)) maxSagitta = sagitta;
+
+	}
+	std::cout << Form(" Max sagitta = %e => pt = %f",maxSagitta, 0.3*0.5*distL2*distL2/8./maxSagitta) << std::endl;
+
+	return maxSagitta;
+}
+
+
+//__________________________________________________________________________
+Double_t QuadraticRegression(Int_t nVal, Double_t *xVal, Double_t *yVal, Double_t &p0, Double_t &p1, Double_t &p2)
+{
+	/// Perform a Quadratic Regression
+	/// Assume same error on all clusters = 1
+	/// Return ~ Chi2
+
+	TMatrixD y(nVal,1);
+	TMatrixD x(nVal,3);
+	TMatrixD xtrans(3,nVal);
+
+	for (int i=0; i<nVal; i++) {
+		y(i,0) = yVal[i];
+		x(i,0) = 1.;
+		x(i,1) = xVal[i];
+		x(i,2) = xVal[i]*xVal[i];
+		xtrans(0,i) = 1.;
+		xtrans(1,i) = xVal[i];
+		xtrans(2,i) = xVal[i]*xVal[i];
+	}
+	TMatrixD tmp(xtrans,TMatrixD::kMult,x);
+	tmp.Invert();
+
+	TMatrixD tmp2(xtrans,TMatrixD::kMult,y);
+	TMatrixD b(tmp,TMatrixD::kMult,tmp2);
+
+	p0 = b(0,0);
+	p1 = b(1,0);
+	p2 = b(2,0);
+
+	// chi2 = (y-xb)^t . W . (y-xb)
+	TMatrixD tmp3(x,TMatrixD::kMult,b);
+	TMatrixD tmp4(y,TMatrixD::kMinus,tmp3);
+	TMatrixD chi2(tmp4,TMatrixD::kTransposeMult,tmp4);
+
+
+	return chi2(0,0);
+}
+
+//__________________________________________________________________________
+Double_t CircleRegression(Int_t nVal, Double_t *xVal, Double_t *yVal)
+{
+	/// Perform a Circular Regression
+	/// Assume same error on all clusters = 1
+	/// Return Radius evaluation
+	Double_t sumxi2 =0., sumxi =0., sumxiyi =0., sumyi =0.,sumyi2 =0., sumxi3 =0., sumyi3 =0.;
+	Double_t sumxi2yi=0., sumxiyi2=0.;
+	Double_t xi,yi, ri;
+	for (int i=0; i<nVal; i++) {
+		xi = xVal[i]/100.;
+		yi = yVal[i]/100.;
+		ri = TMath::Sqrt(xi*xi + yi*yi);
+//		xi /= ri*ri;
+//		yi /= ri*ri;
+
+		sumxi += xi;
+		sumyi += yi;
+		sumxi2 += xi*xi;
+		sumyi2 += yi*yi;
+		sumxi3 += xi*xi*xi;
+		sumyi3 += yi*yi*yi;
+		sumxiyi += xi*yi;
+		sumxi2yi += xi*xi*yi;
+		sumxiyi2 += xi*yi*yi;
+	}
+
+	Double_t A = nVal * sumxi2 - sumxi*sumxi;
+	Double_t B = nVal * sumxiyi - sumxi*sumyi;
+	Double_t C = nVal * sumyi2 - sumyi*sumyi;
+	Double_t D = 0.5*(nVal*sumxiyi2 -sumxi*sumyi2  +nVal*sumxi3 -sumxi*sumxi2);
+	Double_t E = 0.5*(nVal*sumxi2yi -sumyi*sumxi2  +nVal*sumyi3 -sumyi*sumyi2);
+
+	Double_t aM = (D*C-B*E) / (A*C-B*B);
+	Double_t bM = (A*E-B*D) / (A*C-B*B);
+
+	Double_t rM = 0.;
+	Double_t rK = 0.;
+
+	for (int i=0; i<nVal; i++) {
+		xi = xVal[i]/100.;
+		yi = yVal[i]/100.;
+
+		rM += TMath::Sqrt( (xi-aM)*(xi-aM) + (yi-bM)*(yi-bM) );
+		rK +=  ((xi-aM)*(xi-aM) + (yi-bM)*(yi-bM) );
+	}
+	rM /= nVal;
+	rK = TMath::Sqrt(rK/nVal);
+
+	std::cout << Form("aM %f bM %f rM %f rK %f => pt = %f or %f ",aM,bM,rM,rK,rM*0.3*0.5, rK*0.3*0.5) << std::endl;
+
+	return (rM+rK)/2.;
 }
 
 } // namespace mft

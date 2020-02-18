@@ -22,9 +22,21 @@
 #include "MFTTracking/TrackParam.h"
 #include "DataFormatsMFT/TrackMFT.h"
 #include "DataFormatsITSMFT/Cluster.h"
+#include "ITSMFTReconstruction/ChipMappingMFT.h"
 
+#include <TMath.h>
 #include <TLinearFitter.h>
 #include <list>
+#include "MathUtils/MathBase.h"
+#include <stdexcept>
+#include <TMatrixD.h>
+#include "TVectorD.h"
+#include <TF1.h>
+
+using o2::math_utils::math_base::fitGaus;
+
+
+using namespace o2::math_utils::math_base;
 
 namespace o2
 {
@@ -65,7 +77,7 @@ class TrackFitter
   void addCluster(const TrackParam& startingParam, const o2::itsmft::Cluster& cl, TrackParam& param);
   void smoothTrack(FitterTrackMFT& track, bool finalize);
   void runSmoother(const TrackParam& previousParam, TrackParam& param);
-  Float_t bField = 0.5;                     // Tesla. TODO: calculate value according to the solenoid current
+  Float_t mBField = 0.5;                     // Tesla. TODO: calculate value according to the solenoid current
   static constexpr double SMaxChi2 = 2.e10; ///< maximum chi2 above which the track can be considered as abnormal
   /// z position of the layers
   static constexpr float SDefaultLayerZ[10] = {-45.3, -46.7, -48.6, -50.0, -52.4, -53.8, -67.7, -69.1, -76.1, -77.5};
@@ -82,7 +94,12 @@ static bool extrapToZCov(TrackParam* trackParam, double zEnd, bool updatePropaga
 static void linearExtrapToZ(TrackParam* trackParam, double zEnd);
 static void linearExtrapToZCov(TrackParam* trackParam, double zEnd, bool updatePropagator);
 static void addMCSEffect(TrackParam* trackParam, double dZ, double x0, bool isFieldON = true);
-static Double_t momentumFromSagitta(FitterTrackMFT& track);
+static Double_t momentumFromSagitta(FitterTrackMFT& track, double bFieldZ = 0.5);
+Double_t Sagitta(Int_t nVal, Double_t *xVal, Double_t *yVal, Double_t &distL2, Double_t &q2, double bFieldZ = 0.5);
+Double_t QuadraticRegression(Int_t nVal, Double_t *xVal, Double_t *yVal, Double_t &p0, Double_t &p1, Double_t &p2);
+Double_t CircleRegression(Int_t nVal, Double_t *xVal, Double_t *yVal);
+
+
 
 } // namespace mft
 } // namespace o2
