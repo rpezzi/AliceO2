@@ -62,7 +62,9 @@ void TrackFitter::fit(FitterTrackMFT& track, bool smooth, bool finalize,
     auto itPreviousParam(itParam);
     ++itPreviousParam;
     // TODO: Refine criteria for initTrack: cluster from next MFT layer or next disk?
-    (*itParam).setInverseMomentum(momentumFromSagitta(track)); // TODO: Estimate momentum from MFT track sagitta and chord;
+    //(*itParam).setInvPx(1.0); // TODO: Improve initial momentum estimate
+    //(*itParam).setInvPy(1.0); // TODO: Improve initial momentum estimate
+    //(*itParam).setInvQPz(1.0); // TODO: Improve initial momentum estimate
     initTrack(*itPreviousParam->getClusterPtr(), *itParam->getClusterPtr(), *itParam);
   }
 
@@ -103,10 +105,18 @@ void TrackFitter::initTrack(const o2::itsmft::Cluster& cl1, const o2::itsmft::Cl
   param.setX(cl2.getX());
   param.setY(cl2.getY());
   param.setZ(cl2.getZ());
-  param.setXSlope((cl1.getX() - cl2.getX()) / dZ);
-  param.setYSlope((cl1.getY() - cl2.getY()) / dZ);
-  double impact = cl2.getY() - cl2.getZ() * param.getYSlope();
-  double inverseMomentum = param.getInverseMomentum();
+  param.setInvPx(1.0/cl2.getX());
+  param.setInvPy(1.0/cl2.getY());
+  param.setInvQPz(1.0/cl2.getZ());
+  std::cout << "  seed momentum px, py, pz = " << param.getPx() << " " << param.getPy() << " " << param.getPz() << std::endl;
+
+  //param.setPx(cl2.getZ());
+  //param.setXSlope((cl1.getX() - cl2.getX()) / dZ);
+  //param.setYSlope((cl1.getY() - cl2.getY()) / dZ);
+  //double impact = cl2.getY() - cl2.getZ() * param.getYSlope();
+  double inversePx = param.getInvPx();
+  double inversePy = param.getInvPy();
+  double inverseQPz = param.getInvQPz();
   //param.setInverseMomentum(inverseMomentum);
 
   // compute the track parameter covariances at the last cluster (as if the other clusters did not exist)
@@ -115,13 +125,15 @@ void TrackFitter::initTrack(const o2::itsmft::Cluster& cl1, const o2::itsmft::Cl
   lastParamCov(0, 0) = cl2.getSigmaZ2(); // cl2.getEx2();
   lastParamCov(0, 1) = -lastParamCov(0, 0) / dZ;
   lastParamCov(1, 0) = lastParamCov(0, 1);
-  lastParamCov(1, 1) = (1000. * cl1.getSigmaZ2() + lastParamCov(0, 0)) / dZ / dZ;
+  lastParamCov(1, 1) = cl2.getSigmaY2(); // cl2.getEy2();
 
-  lastParamCov(2, 2) = cl2.getSigmaY2(); // cl2.getEy2();
+  lastParamCov(2, 2) = 100. * inversePx * inversePx;
   lastParamCov(2, 3) = -lastParamCov(2, 2) / dZ;
   lastParamCov(3, 2) = lastParamCov(2, 3);
-  lastParamCov(3, 3) = (1000. * lastParamCov(2, 2)) / dZ / dZ;
-  lastParamCov(4, 4) = inverseMomentum * inverseMomentum;
+  lastParamCov(3, 3) = 100. * inversePy * inversePy;
+  lastParamCov(4, 4) = 100. * inverseQPz * inverseQPz;
+  //lastParamCov.UnitMatrix();
+  lastParamCov.Print();
   param.setCovariances(lastParamCov);
 
   // set other parameters
@@ -150,35 +162,48 @@ void TrackFitter::addCluster(const TrackParam& startingParam, const o2::itsmft::
   // add MCS effect in the current layer
   o2::itsmft::ChipMappingMFT mftChipMapper;
   int currentLayer(mftChipMapper.chip2Layer(startingParam.getClusterPtr()->getSensorID()));
-  addMCSEffect(&param, SLayerThicknessInX0[currentLayer], -1.);
+  //addMCSEffect(&param, SLayerThicknessInX0[currentLayer], -1.);
 
   // reset propagator for smoother
   if (mSmooth) {
     param.resetPropagator();
   }
 
+
+  auto tanl = param.getPt()/param.getPz();
+  auto sinp = param.getPy()/param.getPt();
+  LOG(INFO) << "   ParamsBeforeExtrap: Tgl = " << tanl << "  Snp = " << sinp <<  "  px = " << param.getPx() << "  py = " <<  param.getPy() <<  " pz = " << param.getPz() << " pt = " <<  param.getPt() <<  std::endl;
+
+
   // add MCS in missing layers if any
   int expectedLayer(currentLayer - 1);
   currentLayer = mftChipMapper.chip2Layer(cl.getSensorID());
   while (currentLayer < expectedLayer) {
     if (!extrapToZCov(&param, SDefaultLayerZ[expectedLayer], mSmooth)) {
-      throw std::runtime_error("Track extrapolation failed");
+      throw std::runtime_error("1. Track extrapolation failed");
     }
-    addMCSEffect(&param, SLayerThicknessInX0[expectedLayer], -1.);
+    //addMCSEffect(&param, SLayerThicknessInX0[expectedLayer], -1.);
     expectedLayer--;
   }
 
   // extrapolate to the z position of the new cluster
   if (!extrapToZCov(&param, cl.getZ(), mSmooth)) {
-    throw std::runtime_error("Track extrapolation failed");
+    throw std::runtime_error("2. Track extrapolation failed");
   }
+
+  tanl = param.getPt()/param.getPz();
+  sinp = param.getPy()/param.getPt();
+  LOG(INFO) << "   ParamsAfterExtrap: Tgl = " << tanl << "  Snp = " << sinp <<  "  px = " << param.getPx() << "  py = " <<  param.getPy() <<  " pz = " << param.getPz() << " pt = " <<  param.getPt() <<  std::endl << std::endl;
 
   // save extrapolated parameters and covariances for smoother
   if (mSmooth) {
     param.setExtrapParameters(param.getParameters());
     param.setExtrapCovariances(param.getCovariances());
   }
-
+  // Forcing non-zero determinant for kalman filter
+  //TMatrixD unitParam(param.getCovariances());
+  //unitParam.UnitMatrix();
+  //param.setCovariances(unitParam);
   // recompute the parameters
   param.setClusterPtr(&cl);
   try {
@@ -241,7 +266,7 @@ void TrackFitter::runKalmanFilter(TrackParam& trackParam)
   TMatrixD clusterParam(5, 1);
   clusterParam.Zero();
   clusterParam(0, 0) = cluster->getX();
-  clusterParam(2, 0) = cluster->getY();
+  clusterParam(1, 0) = cluster->getY();
 
   // compute the actual parameter weight (W)
   TMatrixD paramWeight(trackParam.getCovariances());
@@ -255,7 +280,7 @@ void TrackFitter::runKalmanFilter(TrackParam& trackParam)
   TMatrixD clusterWeight(5, 5);
   clusterWeight.Zero();
   clusterWeight(0, 0) = 1. / cluster->getSigmaZ2(); // 1. / cluster->getEx2();
-  clusterWeight(2, 2) = 1. / cluster->getSigmaY2(); //  1. / cluster->getEy2();
+  clusterWeight(1, 1) = 1. / cluster->getSigmaY2(); //  1. / cluster->getEy2();
 
   // compute the new parameters covariance matrix ((W+U)^-1)
   TMatrixD newParamCov(paramWeight, TMatrixD::kPlus, clusterWeight);
@@ -305,7 +330,7 @@ void TrackFitter::runSmoother(const TrackParam& previousParam, TrackParam& param
   if (extrapWeight.Determinant() != 0) {
     extrapWeight.Invert(); // (C(k+1 k))^-1
   } else {
-    throw std::runtime_error("3. Determinant = 0");
+    throw std::runtime_error("Determinant = 0");
   }
   TMatrixD smootherGain(filteredCovariances, TMatrixD::kMultTranspose, propagator); // C(kk) * F(k)^t
   smootherGain *= extrapWeight;                                                     // C(kk) * F(k)^t * (C(k+1 k))^-1
@@ -339,7 +364,7 @@ void TrackFitter::runSmoother(const TrackParam& previousParam, TrackParam& param
   if (smoothResidualWeight.Determinant() != 0) {
     smoothResidualWeight.Invert();
   } else {
-    throw std::runtime_error("4. Determinant = 0");
+    throw std::runtime_error("Determinant = 0");
   }
 
   // compute local chi2 = (r(k n))^t * W(k n) * r(k n)
@@ -360,8 +385,10 @@ void linearExtrapToZ(TrackParam* trackParam, double zEnd)
 
   // Compute track parameters
   double dZ = zEnd - trackParam->getZ();
-  trackParam->setX(trackParam->getX() + trackParam->getXSlope() * dZ);
-  trackParam->setY(trackParam->getY() + trackParam->getYSlope() * dZ);
+  double xSlope = trackParam->getPx()/trackParam->getPz();
+  double ySlope = trackParam->getPy()/trackParam->getPz();
+  trackParam->setX(trackParam->getX() + xSlope * dZ);
+  trackParam->setY(trackParam->getY() + ySlope * dZ);
   trackParam->setZ(zEnd);
 }
 
@@ -385,8 +412,10 @@ void linearExtrapToZCov(TrackParam* trackParam, double zEnd, bool updatePropagat
 
   // Compute track parameters
   double dZ = zEnd - trackParam->getZ();
-  trackParam->setX(trackParam->getX() + trackParam->getXSlope() * dZ);
-  trackParam->setY(trackParam->getY() + trackParam->getYSlope() * dZ);
+  double xSlope = trackParam->getPx()/trackParam->getPz();
+  double ySlope = trackParam->getPy()/trackParam->getPz();
+  trackParam->setX(trackParam->getX() + xSlope * dZ);
+  trackParam->setY(trackParam->getY() + ySlope * dZ);
   trackParam->setZ(zEnd);
 
   // Calculate the jacobian related to the track parameters linear extrapolation to "zEnd"
@@ -407,6 +436,77 @@ void linearExtrapToZCov(TrackParam* trackParam, double zEnd, bool updatePropagat
 }
 
 //__________________________________________________________________________
+void helixExtrapToZ(TrackParam* trackParam, double zEnd) {
+  /// Track parameters extrapolated to the plane at "zEnd" considering a helix
+  /// On return, results from the extrapolation are updated in trackParam.
+
+  if (trackParam->getZ() == zEnd) {
+    return; // nothing to be done if same z
+  }
+
+  // Compute track parameters
+  double dZ = zEnd - trackParam->getZ();
+  double x0 = trackParam->getX();
+  double y0 = trackParam->getY();
+  double invpx0 = trackParam->getInvPx();
+  double invpy0 = trackParam->getInvPy();
+  double invqpz0 = trackParam->getInvQPz();
+
+  double k = -0.3 * 0.5; // k = -0.3 * B ; B = Field in Tesla FIXME: Get global field
+
+  double x = x0 + dZ*TMath::Abs(invqpz0)/invpx0;
+  double y = y0 + dZ*TMath::Abs(invqpz0)/invpy0;
+  double invpx = 1.0/(1.0/invpx0-dZ*k*invqpz0/invpy0);
+  double invpy = 1.0/(1.0/invpy0-dZ*k*invqpz0/invpx0);
+  trackParam->setX(x);
+  trackParam->setY(y);
+  trackParam->setZ(zEnd);
+  trackParam->setInvPx(invpx);
+  trackParam->setInvPy(invpy);
+
+}
+
+//__________________________________________________________________________
+void helixExtrapToZCov(TrackParam* trackParam, double zEnd, bool updatePropagator) {
+  // TODO: Implement helix covariance extrapolation
+
+helixExtrapToZ(trackParam, zEnd);
+
+// Calculate the jacobian related to the track parameters linear extrapolation to "zEnd"
+double dZ = zEnd - trackParam->getZ();
+double invpx = trackParam->getInvPx();
+double invpy = trackParam->getInvPy();
+double invqpz = trackParam->getInvQPz();
+
+double k = - 0.3 * 0.5 ; // FIXME:
+
+TMatrixD jacob(5, 5);
+jacob.UnitMatrix();
+jacob(0, 2) = -TMath::Abs(invqpz)*dZ/invpx/invpx;
+jacob(0, 4) = dZ/invpx*TMath::Sign(1.,invqpz);
+jacob(1, 3) = -TMath::Abs(invqpz)*dZ/invpy/invpy;
+jacob(1, 4) = dZ/invpy*TMath::Sign(1.,invqpz);
+jacob(2, 2) = 1. + 2. * invpx * invqpz * dZ * k / invpy;
+jacob(2, 3) = - invqpz * k * invpx * invpx * dZ / invpy / invpy;
+jacob(2, 4) = dZ / invpy * invpx * invpx * k;
+jacob(3, 2) = invqpz * k * invpy * invpy * dZ / invpx / invpx;
+jacob(2, 3) = 1. - 2. * invpy * invqpz * dZ * k / invpx;
+jacob(3, 4) = - dZ / invpx * invpy * invpy * k;
+
+
+// Extrapolate track parameter covariances to "zEnd"
+TMatrixD tmp(trackParam->getCovariances(), TMatrixD::kMultTranspose, jacob);
+TMatrixD tmp2(jacob, TMatrixD::kMult, tmp);
+trackParam->setCovariances(tmp2);
+
+// Update the propagator if required
+if (updatePropagator) {
+  trackParam->updatePropagator(jacob);
+}
+
+}
+
+//__________________________________________________________________________
 bool extrapToZ(TrackParam* trackParam, double zEnd, bool isFieldON)
 {
   /// Interface to track parameter extrapolation to the plane at "Z".
@@ -415,7 +515,7 @@ bool extrapToZ(TrackParam* trackParam, double zEnd, bool isFieldON)
     linearExtrapToZ(trackParam, zEnd);
     return true;
   } else {
-    linearExtrapToZ(trackParam, zEnd); // FIXME: Add proper helix extrapolation
+    helixExtrapToZ(trackParam, zEnd);
     return true;
   }
 }
@@ -426,90 +526,13 @@ bool extrapToZCov(TrackParam* trackParam, double zEnd, bool updatePropagator, bo
   /// Track parameters and their covariances extrapolated to the plane at "zEnd".
   /// On return, results from the extrapolation are updated in trackParam.
 
-  //++sNCallExtrapToZCov;
-
-  if (trackParam->getZ() == zEnd) {
-    return true; // nothing to be done if same z
-  }
-
   if (!isFieldON) { // linear extrapolation if no magnetic field
-    linearExtrapToZCov(trackParam, zEnd, updatePropagator);
-    return true;
-  }
-
-  // No need to propagate the covariance matrix if it does not exist
-  if (!trackParam->hasCovariances()) {
-    LOG(WARNING) << "Covariance matrix does not exist";
-    // Extrapolate track parameters to "zEnd"
-    return extrapToZ(trackParam, zEnd);
-  }
-
-  // Save the actual track parameters
-  TrackParam trackParamSave(*trackParam);
-  TMatrixD paramSave(trackParamSave.getParameters());
-  double zBegin = trackParamSave.getZ();
-
-  // Get reference to the parameter covariance matrix
-  const TMatrixD& kParamCov = trackParam->getCovariances();
-
-  // Extrapolate track parameters to "zEnd"
-  // Do not update the covariance matrix if the extrapolation failed
-  if (!extrapToZ(trackParam, zEnd)) {
-    return false;
-  }
-
-  // Get reference to the extrapolated parameters
-  const TMatrixD& extrapParam = trackParam->getParameters();
-
-  // Calculate the jacobian related to the track parameters extrapolation to "zEnd"
-  TMatrixD jacob(5, 5);
-  jacob.Zero();
-  TMatrixD dParam(5, 1);
-  double direction[5] = {-1., -1., 1., 1., -1.};
-  for (int i = 0; i < 5; i++) {
-    // Skip jacobian calculation for parameters with no associated error
-    if (kParamCov(i, i) <= 0.) {
-      continue;
+      linearExtrapToZCov(trackParam, zEnd, updatePropagator);
+      return true;
+    } else {
+      helixExtrapToZCov(trackParam, zEnd, updatePropagator);
+      return true;
     }
-
-    // Small variation of parameter i only
-    for (int j = 0; j < 5; j++) {
-      if (j == i) {
-        dParam(j, 0) = TMath::Sqrt(kParamCov(i, i));
-        dParam(j, 0) *= TMath::Sign(1., direction[j] * paramSave(j, 0)); // variation always in the same direction
-      } else {
-        dParam(j, 0) = 0.;
-      }
-    }
-
-    // Set new parameters
-    trackParamSave.setParameters(paramSave);
-    trackParamSave.addParameters(dParam);
-    trackParamSave.setZ(zBegin);
-
-    // Extrapolate new track parameters to "zEnd"
-    if (!extrapToZ(&trackParamSave, zEnd)) {
-      LOG(WARNING) << "Bad covariance matrix";
-      return false;
-    }
-
-    // Calculate the jacobian
-    TMatrixD jacobji(trackParamSave.getParameters(), TMatrixD::kMinus, extrapParam);
-    jacobji *= 1. / dParam(i, 0);
-    jacob.SetSub(0, i, jacobji);
-  }
-
-  // Extrapolate track parameter covariances to "zEnd"
-  TMatrixD tmp(kParamCov, TMatrixD::kMultTranspose, jacob);
-  TMatrixD tmp2(jacob, TMatrixD::kMult, tmp);
-  trackParam->setCovariances(tmp2);
-
-  // Update the propagator if required
-  if (updatePropagator) {
-    trackParam->updatePropagator(jacob);
-  }
-
-  return true;
 }
 
 //__________________________________________________________________________
@@ -521,8 +544,9 @@ void addMCSEffect(TrackParam* trackParam, double dZ, double x0, bool isFieldON)
   /// dZ = zOut - zIn (sign is important) and "param" is assumed to be given zOut.
   /// If x0 <= 0., assume dZ = pathLength/x0 and consider the material thickness as negligible.
 
-  double ySlope = trackParam->getYSlope();
-  double xSlope = trackParam->getXSlope();
+  double xSlope = trackParam->getPx()/trackParam->getPz();
+  double ySlope = trackParam->getPy()/trackParam->getPz();
+
   double inverseMomentum = trackParam->getInverseMomentum();
   double inverseTotalMomentum2 = inverseMomentum * inverseMomentum * (1.0 + ySlope * ySlope) /
                                  (1.0 + ySlope * ySlope + xSlope * xSlope);
@@ -541,13 +565,13 @@ void addMCSEffect(TrackParam* trackParam, double dZ, double x0, bool isFieldON)
 
   // Set MCS covariance matrix
   TMatrixD newParamCov(trackParam->getCovariances());
-  // Non bending plane
+  // Non bending plane    // FIXME: Update param coordinate system
   newParamCov(0, 0) += varCoor;
   newParamCov(0, 1) += covCorrSlope;
   newParamCov(1, 0) += covCorrSlope;
-  newParamCov(1, 1) += varSlop;
+  newParamCov(1, 1) += varCoor;
   // Bending plane
-  newParamCov(2, 2) += varCoor;
+  newParamCov(2, 2) += varSlop;
   newParamCov(2, 3) += covCorrSlope;
   newParamCov(3, 2) += covCorrSlope;
   newParamCov(3, 3) += varSlop;

@@ -81,6 +81,8 @@ static bool extrapToZ(TrackParam* trackParam, double zEnd, bool isFieldON = true
 static bool extrapToZCov(TrackParam* trackParam, double zEnd, bool updatePropagator = false, bool isFieldON = true);
 static void linearExtrapToZ(TrackParam* trackParam, double zEnd);
 static void linearExtrapToZCov(TrackParam* trackParam, double zEnd, bool updatePropagator);
+static void helixExtrapToZ(TrackParam* trackParam, double zEnd);
+static void helixExtrapToZCov(TrackParam* trackParam, double zEnd, bool updatePropagator);
 static void addMCSEffect(TrackParam* trackParam, double dZ, double x0, bool isFieldON = true);
 static Double_t momentumFromSagitta(FitterTrackMFT& track);
 

@@ -90,19 +90,15 @@ void TrackFitterTask::run(ProcessingContext& pc)
     //auto slopeY = (track.last().getY() - track.first().getY()) / dz;
 
     // TODO: Convert FitterTrackMFT to TrackMFTExt or TrackMFT
-    auto slopeX = track.first().getXSlope();
-    auto slopeY = track.first().getYSlope();
-    auto tanl = -std::sqrt(1.f / (slopeX * slopeX + slopeY * +slopeY));
-    auto tanp = slopeY / slopeX;
-    auto sinp = tanp / std::sqrt(1.f + tanp * tanp);
-    //LOG(INFO) << "   TrackPars: Tgl = " << tanl << "  Snp = " << sinp << std::endl;
+    auto tanl = track.first().getPt()/track.first().getPz();
+    auto sinp = track.first().getPy()/track.first().getPt();
+    LOG(INFO) << "   TrackPars: Tgl = " << tanl << "  Snp = " << sinp <<  "  px = " << track.first().getPx() << "  py = " <<  track.first().getPy() <<  " pz = " << track.first().getPz() << " pt = " <<  track.first().getPt() <<  std::endl;
     temptrack.setX(track.first().getX());
     temptrack.setY(track.first().getY());
     temptrack.setZ(track.first().getZ());
     temptrack.setTgl(tanl);
     temptrack.setSnp(sinp);
-    auto Q2Pt = sqrt(1 + tanl * tanl) * track.first().getInverseMomentum();
-    temptrack.setQ2Pt(Q2Pt);
+    temptrack.setQ2Pt(track.first().getCharge()/track.first().getPt());
   }
 
   LOG(INFO) << "MFTFitter loaded " << tracksLTF.size() << " LTF tracks";
