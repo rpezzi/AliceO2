@@ -12,14 +12,14 @@
 /// \brief
 ///
 
-#ifndef TRAKINGITSU_INCLUDE_GPU_ARRAY_H_
-#define TRAKINGITSU_INCLUDE_GPU_ARRAY_H_
+#ifndef ALICEO2_ITSMFT_GPU_ARRAY_H_
+#define ALICEO2_ITSMFT_GPU_ARRAY_H_
 
-#include "ITStracking/Definitions.h"
+#include "ITSMFTcuda/Definitions.h"
 
 namespace o2
 {
-namespace its
+namespace itsmft
 {
 namespace GPU
 {
@@ -65,7 +65,7 @@ struct Array final {
   T InternalArray[Size];
 };
 } // namespace GPU
-} // namespace its
+} // namespace itsmft
 } // namespace o2
 
-#endif /* TRAKINGITSU_INCLUDE_GPU_CAGPUVECTOR_H_ */
+#endif /* ALICEO2_ITSMFT_GPU_ARRAY_H_ */

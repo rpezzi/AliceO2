@@ -12,14 +12,14 @@
 /// \brief
 ///
 
-#ifndef TRAKINGITSU_INCLUDE_GPU_STREAM_H_
-#define TRAKINGITSU_INCLUDE_GPU_STREAM_H_
+#ifndef ALICEO2_ITSMFT_GPU_STREAM_H_
+#define ALICEO2_ITSMFT_GPU_STREAM_H_
 
-#include "ITStracking/Definitions.h"
+#include "ITSMFTcuda/Definitions.h"
 
 namespace o2
 {
-namespace its
+namespace itsmft
 {
 namespace GPU
 {
@@ -40,7 +40,7 @@ class Stream final
   GPUStream mStream;
 };
 } // namespace GPU
-} // namespace its
+} // namespace itsmft
 } // namespace o2
 
-#endif /* TRAKINGITSU_INCLUDE_GPU_STREAM_H_ */
+#endif /* ALICEO2_ITSMFT_GPU_STREAM_H_ */

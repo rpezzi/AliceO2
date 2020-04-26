@@ -12,14 +12,14 @@
 /// \brief
 ///
 
-#ifndef TRAKINGITSU_INCLUDE_GPU_CAGPUUNIQUE_POINTER_H_
-#define TRAKINGITSU_INCLUDE_GPU_CAGPUUNIQUE_POINTER_H_
+#ifndef ALICEO2_ITSMFT_GPU_UNIQUE_POINTER_H_
+#define ALICEO2_ITSMFT_GPU_UNIQUE_POINTER_H_
 
-#include "ITStrackingCUDA/Utils.h"
+#include "ITSMFTcuda/Utils.h"
 
 namespace o2
 {
-namespace its
+namespace itsmft
 {
 namespace GPU
 {
@@ -118,7 +118,7 @@ void UniquePointer<T>::destroy()
 {
   if (mDevicePointer != nullptr) {
 
-    Utils::Host::gpuFree(mDevicePointer);
+    o2::itsmft::GPU::Utils::Host::gpuFree(mDevicePointer);
   }
 }
 
@@ -146,7 +146,7 @@ GPU_HOST_DEVICE const T& UniquePointer<T>::operator*() const noexcept
   return PointerTraits::getReference(mDevicePointer);
 }
 } // namespace GPU
-} // namespace its
+} // namespace itsmft
 } // namespace o2
 
-#endif /* TRAKINGITSU_INCLUDE_GPU_CAGPUUNIQUE_POINTER_H_ */
+#endif /* ALICEO2_ITSMFT_GPU_UNIQUE_POINTER_H_ */

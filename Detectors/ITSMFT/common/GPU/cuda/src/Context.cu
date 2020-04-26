@@ -12,8 +12,8 @@
 /// \brief
 ///
 
-#include "ITStrackingCUDA/Context.h"
-#include "ITStrackingCUDA/Utils.h"
+#include "ITSMFTcuda/Context.h"
+#include "ITSMFTcuda/Utils.h"
 
 #include <sstream>
 #include <stdexcept>
@@ -46,6 +46,9 @@ inline int getCudaCores(const int major, const int minor)
       {0x60, 64},  // Pascal Generation (SM 6.0) GP100 class
       {0x61, 128}, // Pascal Generation (SM 6.1) GP10x class
       {0x62, 128}, // Pascal Generation (SM 6.2) GP10x class
+      {0x70, 64},  // Volta Generation (SM 7.0) GV100 class
+      {0x72, 64},  // Volta Generation (SM 7.2) GV10B class
+      {0x75, 64},  // Turing Generation (SM 7.5) TU1xx class
       {-1, -1}};
 
   int index = 0;
@@ -72,7 +75,7 @@ inline int getMaxThreadsPerSM(const int major, const int minor)
 
 namespace o2
 {
-namespace its
+namespace itsmft
 {
 namespace GPU
 {
@@ -167,5 +170,5 @@ const DeviceProperties& Context::getDeviceProperties(const int deviceIndex)
 }
 
 } // namespace GPU
-} // namespace its
+} // namespace itsmft
 } // namespace o2

@@ -25,7 +25,7 @@
 #include "ITStracking/Tracklet.h"
 
 #include "ITStrackingCUDA/DeviceStoreVertexerGPU.h"
-#include "ITStrackingCUDA/UniquePointer.h"
+#include "ITSMFTcuda/UniquePointer.h"
 
 #ifdef _ALLOW_DEBUG_TREES_ITS_
 #include "ITStracking/StandaloneDebugger.h"

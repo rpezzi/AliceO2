@@ -12,8 +12,8 @@
 /// \brief
 ///
 
-#ifndef TRAKINGITSU_INCLUDE_GPU_CONTEXT_H_
-#define TRAKINGITSU_INCLUDE_GPU_CONTEXT_H_
+#ifndef ALICEO2_ITSMFT_GPU_CONTEXT_H_
+#define ALICEO2_ITSMFT_GPU_CONTEXT_H_
 
 #include <string>
 #include <vector>
@@ -21,7 +21,7 @@
 
 namespace o2
 {
-namespace its
+namespace itsmft
 {
 namespace GPU
 {
@@ -63,7 +63,7 @@ class Context final
   std::vector<DeviceProperties> mDeviceProperties;
 };
 } // namespace GPU
-} // namespace its
+} // namespace itsmft
 } // namespace o2
 
-#endif /* TRAKINGITSU_INCLUDE_GPU_CONTEXT_H_ */
+#endif /* ALICEO2_ITSMFT_GPU_CONTEXT_H_ */

@@ -25,7 +25,7 @@
 #include "ITStracking/Tracklet.h"
 
 #include "ITStrackingCUDA/DeviceStoreNV.h"
-#include "ITStrackingCUDA/UniquePointer.h"
+#include "ITSMFTcuda/UniquePointer.h"
 
 namespace o2
 {

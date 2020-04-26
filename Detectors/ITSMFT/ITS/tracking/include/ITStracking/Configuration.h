@@ -162,7 +162,7 @@ struct VertexerStoreConfigurationGPU {
                                 int maxTrkCap,
                                 int maxVert);
 
-  // o2::its::GPU::Vector constructor requires signed size for initialisation
+  // o2::itsmft::GPU::Vector constructor requires signed size for initialisation
   int tmpCUBBufferSize = 25e5;
   int maxTrackletsPerCluster = 2e2;
   int clustersPerLayerCapacity = 4e4;

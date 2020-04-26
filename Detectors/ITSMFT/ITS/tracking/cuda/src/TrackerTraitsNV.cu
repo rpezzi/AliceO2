@@ -21,16 +21,15 @@
 #include <cooperative_groups.h>
 
 #include "cub/cub.cuh"
-
+#include "ITSMFTcuda/Context.h"
+#include "ITSMFTcuda/Stream.h"
 #include "ITStracking/Constants.h"
 #include "ITStracking/Configuration.h"
 #include "ITStracking/IndexTableUtils.h"
 #include "ITStracking/MathUtils.h"
-#include "ITStrackingCUDA/Context.h"
 #include "ITStrackingCUDA/DeviceStoreNV.h"
 #include "ITStrackingCUDA/PrimaryVertexContextNV.h"
-#include "ITStrackingCUDA/Stream.h"
-#include "ITStrackingCUDA/Vector.h"
+#include "ITSMFTcuda/Vector.h"
 
 namespace o2
 {

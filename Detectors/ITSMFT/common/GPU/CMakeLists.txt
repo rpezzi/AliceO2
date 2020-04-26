@@ -8,10 +8,9 @@
 # granted to it by virtue of its status as an Intergovernmental Organization or
 # submit itself to any jurisdiction.
 
-add_subdirectory(base)
-add_subdirectory(GPU)
-add_subdirectory(simulation)
-add_subdirectory(reconstruction)
-add_subdirectory(workflow)
 
-o2_data_file(COPY data DESTINATION Detectors/ITSMFT)
+
+if(CUDA_ENABLED)
+  add_subdirectory(cuda)
+  set_property(TARGET ${targetName} PROPERTY CUDA_SEPARABLE_COMPILATION ON)
+endif()

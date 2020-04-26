@@ -21,9 +21,9 @@
 #include "ITStracking/Constants.h"
 #include "ITStracking/Definitions.h"
 #include "ITStracking/Tracklet.h"
-#include "ITStrackingCUDA/Array.h"
-#include "ITStrackingCUDA/UniquePointer.h"
-#include "ITStrackingCUDA/Vector.h"
+#include "ITSMFTcuda/Array.h"
+#include "ITSMFTcuda/UniquePointer.h"
+#include "ITSMFTcuda/Vector.h"
 
 namespace o2
 {
@@ -31,6 +31,8 @@ namespace its
 {
 namespace GPU
 {
+
+using namespace o2::itsmft::GPU;
 
 class DeviceStoreNV final
 {

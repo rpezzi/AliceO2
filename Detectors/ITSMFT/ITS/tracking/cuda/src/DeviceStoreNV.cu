@@ -16,7 +16,7 @@
 
 #include <sstream>
 
-#include "ITStrackingCUDA/Stream.h"
+#include "ITSMFTcuda/Stream.h"
 
 namespace
 {

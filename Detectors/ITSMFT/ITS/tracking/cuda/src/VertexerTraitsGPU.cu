@@ -18,21 +18,20 @@
 #include <assert.h>
 #include <cub/cub.cuh>
 
+#include "ITSMFTcuda/Stream.h"
 #include "ITStracking/MathUtils.h"
 #include "ITStracking/Configuration.h"
 #include "ITStracking/ClusterLines.h"
 #include "ITStracking/Tracklet.h"
-
-#include "ITStrackingCUDA/Utils.h"
 #include "ITStrackingCUDA/ClusterLinesGPU.h"
-#include "ITStrackingCUDA/Context.h"
-#include "ITStrackingCUDA/Stream.h"
 #include "ITStrackingCUDA/VertexerTraitsGPU.h"
 
 namespace o2
 {
 namespace its
 {
+
+using namespace o2::itsmft::GPU;
 
 using constants::index_table::PhiBins;
 using constants::index_table::ZBins;

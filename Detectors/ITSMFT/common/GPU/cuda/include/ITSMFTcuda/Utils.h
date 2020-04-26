@@ -12,15 +12,15 @@
 /// \brief
 ///
 
-#ifndef TRACKINGITSU_INCLUDE_GPU_UTILS_H_
-#define TRACKINGITSU_INCLUDE_GPU_UTILS_H_
+#ifndef ALICEO2_ITSMFT_GPU_UTILS_H_
+#define ALICEO2_ITSMFT_GPU_UTILS_H_
 
 #include "GPUCommonDef.h"
 #include "ITSMFTcuda/Stream.h"
 
 namespace o2
 {
-namespace its
+namespace itsmft
 {
 namespace GPU
 {
@@ -30,8 +30,6 @@ namespace Utils
 
 namespace Host
 {
-
-using Stream = o2::itsmft::GPU::Stream;
 
 #ifdef __CUDACC__
 void checkCUDAError(const cudaError_t error, const char* file, const int line);
@@ -61,7 +59,7 @@ GPUd() int gpuAtomicAdd(int*, const int);
 } // namespace Device
 } // namespace Utils
 } // namespace GPU
-} // namespace its
+} // namespace itsmft
 } // namespace o2
 
-#endif /* TRACKINGITSU_INCLUDE_GPU_UTILS_H_ */
+#endif /* ALICEO2_ITSMFT_GPU_UTILS_H_ */

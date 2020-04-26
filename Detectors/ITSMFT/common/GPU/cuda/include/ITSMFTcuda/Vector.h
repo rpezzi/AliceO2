@@ -21,15 +21,17 @@
 #include <vector>
 
 #include "ITStracking/Definitions.h"
-#include "ITStrackingCUDA/Stream.h"
-#include "ITStrackingCUDA/Utils.h"
+#include "ITSMFTcuda/Utils.h"
+#include "ITSMFTcuda/Stream.h"
 
 namespace o2
 {
-namespace its
+namespace itsmft
 {
 namespace GPU
 {
+
+using namespace o2::itsmft::GPU;
 
 template <typename T>
 class Vector final
@@ -325,7 +327,7 @@ GPU_HOST_DEVICE void Vector<T>::dump()
          mArrayPointer, mDeviceSize, mCapacity, mIsWeak ? "true" : "false");
 }
 } // namespace GPU
-} // namespace its
+} // namespace itsmft
 } // namespace o2
 
 #endif /* TRAKINGITSU_INCLUDE_GPU_VECTOR_H_ */

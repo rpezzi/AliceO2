@@ -23,10 +23,10 @@
 #include "ITStracking/Configuration.h"
 #include "ITStracking/Tracklet.h"
 #include "ITStracking/ClusterLines.h"
-#include "ITStrackingCUDA/Array.h"
+#include "ITSMFTcuda/Array.h"
 #include "ITStrackingCUDA/ClusterLinesGPU.h"
-#include "ITStrackingCUDA/UniquePointer.h"
-#include "ITStrackingCUDA/Vector.h"
+#include "ITSMFTcuda/UniquePointer.h"
+#include "ITSMFTcuda/Vector.h"
 #include "GPUCommonDef.h"
 
 namespace o2
@@ -35,6 +35,8 @@ namespace its
 {
 namespace GPU
 {
+
+using namespace o2::itsmft::GPU;
 
 enum class TrackletingLayerOrder {
   fromInnermostToMiddleLayer,

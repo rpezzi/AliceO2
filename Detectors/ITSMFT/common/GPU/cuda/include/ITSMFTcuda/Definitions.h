@@ -12,8 +12,8 @@
 /// \brief
 ///
 
-#ifndef TRACKINGITSU_INCLUDE_CADEFINITIONS_H_
-#define TRACKINGITSU_INCLUDE_CADEFINITIONS_H_
+#ifndef ALICEO2_ITSMFT_GPU_DEFINITIONS_H_
+#define ALICEO2_ITSMFT_GPU_DEFINITIONS_H_
 
 // #define _ALLOW_DEBUG_TREES_ITS_ // to allow debug (vertexer only)
 
@@ -58,11 +58,6 @@
 #define GPU_SYNC __syncthreads()
 
 #define MATH_CEIL ceil
-
-#include "ITSMFTcuda/Array.h"
-
-template <typename T, std::size_t Size>
-using GPUArray = o2::itsmft::GPU::Array<T, Size>;
 
 typedef cudaStream_t GPUStream;
 

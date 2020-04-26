@@ -12,7 +12,7 @@
 /// \brief
 ///
 
-#include "ITStrackingCUDA/Utils.h"
+#include "ITSMFTcuda/Utils.h"
 
 #include <sstream>
 #include <stdexcept>
@@ -66,12 +66,10 @@ int findNearestDivisor(const int numToRound, const int divisor)
 
 namespace o2
 {
-namespace its
+namespace itsmft
 {
 namespace GPU
 {
-
-using namespace o2::itsmft::GPU;
 
 void Utils::Host::checkCUDAError(const cudaError_t error, const char* file, const int line)
 {
@@ -191,5 +189,5 @@ GPUd() int Utils::Device::gpuAtomicAdd(int* p, const int incrementSize)
 }
 
 } // namespace GPU
-} // namespace its
+} // namespace itsmft
 } // namespace o2
