@@ -40,6 +40,7 @@ struct MFTTrackingParam : public o2::conf::ConfigurableParamHelper<MFTTrackingPa
   Int_t trackmodel = MFTTrackModel::Helix;
   double sigmaboost = 1e0;
   double seedH_k = 1.0;
+  double MFTRadLenghts = 0.041; // Average material budget for all MFT disks
 
   O2ParamDef(MFTTrackingParam, "MFTTracking");
 };
