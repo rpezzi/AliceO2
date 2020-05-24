@@ -244,10 +244,32 @@ bool TrackFitter::addCluster(const TrackParamMFT& startingParam, const o2::itsmf
   param.setCovariances(startingParam.getCovariances());
   param.setTrackChi2(startingParam.getTrackChi2());
 
-  // add MCS effect in the current layer
-  //o2::itsmft::ChipMappingMFT mftChipMapper;
-  //int currentLayer(mftChipMapper.chip2Layer(startingParam.getClusterPtr()->getSensorID()));
-  //mTrackExtrap.addMCSEffect(&param, SLayerThicknessInX0[currentLayer], -1.);
+  // add MCS effects for the new cluster
+  using o2::mft::constants::LayerZPosition;
+  int startingLayerID, newLayerID;
+
+  double dZ = TMath::Abs(cl.getZ() - startingParam.getZ());
+  //LayerId of each cluster from ZPosition
+  for (auto layer = 10; layer--;)
+    if (startingParam.getZ() < LayerZPosition[layer] + .3 & startingParam.getZ() > LayerZPosition[layer] - .3)
+      startingLayerID = layer;
+  for (auto layer = 10; layer--;)
+    if (cl.getZ() < LayerZPosition[layer] + .3 & cl.getZ() > LayerZPosition[layer] - .3)
+      newLayerID = layer;
+  // Number of disks crossed by this tracklet
+  int NDisksMS = (startingLayerID % 2 == 0) ? (startingLayerID - newLayerID) / 2 : (startingLayerID - newLayerID + 1) / 2;
+
+  double MFTDiskThicknessInX0 = 0.0082;
+  std::cout << "startingLayerID = " << startingLayerID << std::endl;
+  std::cout << "newLayerID = " << newLayerID << std::endl;
+  std::cout << "cl.getZ() = " << cl.getZ() << std::endl;
+  std::cout << "startingParam.getZ() = " << startingParam.getZ() << std::endl;
+  //  std::cout << " = " <<  << std::endl;
+  std::cout << "NDisksMS = " << NDisksMS << std::endl;
+
+  // Add MCS effects
+  if (NDisksMS != 0)
+    mTrackExtrap.addMCSEffect(&param, dZ, NDisksMS * MFTDiskThicknessInX0);
 
   // reset propagator for smoother
   if (mSmooth) {
@@ -257,19 +279,6 @@ bool TrackFitter::addCluster(const TrackParamMFT& startingParam, const o2::itsmf
   if (mVerbose)
     std::cout << "  BeforeExtrap: X = " << param.getX() << " Y = " << param.getY() << " Z = " << param.getZ() << " Tgl = " << param.getTanl() << "  Phi = " << param.getPhi() << " pz = " << param.getPz() << " qpt = " << 1.0 / param.getInvQPt() << std::endl;
   //param.getCovariances().Print();
-
-  /*
-  // add MCS in missing layers if any
-  int expectedLayer(currentLayer - 1);
-  currentLayer = mftChipMapper.chip2Layer(cl.getSensorID());
-  while (currentLayer < expectedLayer) {
-    if (!mTrackExtrap.extrapToZCov(&param, o2::mft::constants::LayerZPosition[expectedLayer], mSmooth)) {
-      return false;
-    }
-    //mTrackExtrap.addMCSEffect(&param, SLayerThicknessInX0[expectedLayer], -1.);
-    expectedLayer--;
-  }
-  */
 
   // extrapolate to the z position of the new cluster
   mTrackExtrap.extrapToZCov(&param, cl.getZ(), mSmooth);
