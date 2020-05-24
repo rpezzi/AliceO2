@@ -325,59 +325,91 @@ void TrackExtrap::addMCSEffect(TrackParamMFT* trackParam, double dZ, double x0, 
   /// assuming linear propagation and using the small angle approximation.
   /// dZ = zOut - zIn (sign is important) and "param" is assumed to be given zOut.
   /// If x0 <= 0., assume dZ = pathLength/x0 and consider the material thickness as negligible.
-  /// TODO: Port to MFT
 
-  double xSlope = trackParam->getPx() / trackParam->getPz();
-  double ySlope = trackParam->getPy() / trackParam->getPz();
+  double phi0 = trackParam->getPhi();
+  double tanl0 = trackParam->getTanl();
+  double invtanl0 = 1.0 / tanl0;
+  double invqpt0 = trackParam->getInvQPt();
+  double p = trackParam->getP();
 
-  double inverseMomentum = trackParam->getInverseMomentum();
-  double inverseTotalMomentum2 = inverseMomentum * inverseMomentum * (1.0 + ySlope * ySlope) /
-                                 (1.0 + ySlope * ySlope + xSlope * xSlope);
-  // Path length in the material
-  double signedPathLength = dZ * TMath::Sqrt(1.0 + ySlope * ySlope + xSlope * xSlope);
-  double pathLengthOverX0 = (x0 > 0.) ? TMath::Abs(signedPathLength) / x0 : TMath::Abs(signedPathLength);
-  // relativistic velocity
-  double velo = 1.;
+  double cosphi0, sinphi0;
+  o2::utils::sincos(phi0, sinphi0, cosphi0);
+
+  double A = tanl0 * tanl0 + 1;
+  double B = dZ * cosphi0 * invtanl0;
+  double C = dZ * sinphi0 * invtanl0;
+  double D = A * B * invtanl0;
+  double E = -A * C * invtanl0;
+  double F = -C - D;
+  double G = B + E;
+  double H = -invqpt0 * tanl0;
+
+  double csclambda = TMath::Abs(TMath::Sqrt(1 + tanl0 * tanl0) * invtanl0);
+  double pathLengthOverX0 = x0 * csclambda;
+
   // Angular dispersion square of the track (variance) in a plane perpendicular to the trajectory
-  double theta02 = 0.0136 / velo * (1 + 0.038 * TMath::Log(pathLengthOverX0));
-  theta02 *= theta02 * inverseTotalMomentum2 * pathLengthOverX0;
+  double sigmathetasq = 0.0136 * invqpt0 * (1 + 0.038 * TMath::Log(pathLengthOverX0));
+  sigmathetasq *= sigmathetasq * pathLengthOverX0;
 
-  double varCoor = (x0 > 0.) ? signedPathLength * signedPathLength * theta02 / 3. : 0.;
-  double varSlop = theta02;
-  double covCorrSlope = (x0 > 0.) ? signedPathLength * theta02 * 0.5 : 0.;
+  //std::cout << "phi0 = " << phi0  << std::endl;
+  //std::cout << "tanl0 = " << tanl0  << std::endl;
+  //std::cout << "invtanl0 = " << invtanl0 << std::endl;
+  //std::cout << "p = " << p  << std::endl;
+  //std::cout << "csclambda = " << csclambda  << std::endl;
+  //std::cout << "pathLengthOverX0 = " << pathLengthOverX0  << std::endl;
+  //std::cout << "dZ = " << dZ  << std::endl;
+  //std::cout << "x0 = " << x0  << std::endl;
+  //std::cout << "sigmathetasq = " << sigmathetasq << std::endl;
 
   // Set MCS covariance matrix
   TMatrixD newParamCov(trackParam->getCovariances());
-  // Non bending plane    // FIXME: Update param coordinate system
-  newParamCov(0, 0) += varCoor;
-  newParamCov(0, 1) += covCorrSlope;
-  newParamCov(1, 0) += covCorrSlope;
-  newParamCov(1, 1) += varCoor;
-  // Bending plane
-  newParamCov(2, 2) += varSlop;
-  newParamCov(2, 3) += covCorrSlope;
-  newParamCov(3, 2) += covCorrSlope;
-  newParamCov(3, 3) += varSlop;
 
-  // Set momentum related covariances if B!=0
-  if (isFieldON) {
-    // compute derivative d(q/Pxy) / dSlopeX and d(q/Pxy) / dSlopeY
-    double dqPxydSlopeX =
-      inverseMomentum * xSlope / (1. + xSlope * xSlope + ySlope * ySlope);
-    double dqPxydSlopeY = -inverseMomentum * xSlope * xSlope * ySlope /
-                          (1. + ySlope * ySlope) /
-                          (1. + xSlope * xSlope + ySlope * ySlope);
-    // Inverse bending momentum (due to dependences with bending and non bending slopes)
-    newParamCov(4, 0) += dqPxydSlopeX * covCorrSlope;
-    newParamCov(0, 4) += dqPxydSlopeX * covCorrSlope;
-    newParamCov(4, 1) += dqPxydSlopeX * varSlop;
-    newParamCov(1, 4) += dqPxydSlopeX * varSlop;
-    newParamCov(4, 2) += dqPxydSlopeY * covCorrSlope;
-    newParamCov(2, 4) += dqPxydSlopeY * covCorrSlope;
-    newParamCov(4, 3) += dqPxydSlopeY * varSlop;
-    newParamCov(3, 4) += dqPxydSlopeY * varSlop;
-    newParamCov(4, 4) += (dqPxydSlopeX * dqPxydSlopeX + dqPxydSlopeY * dqPxydSlopeY) * varSlop;
-  }
+  //  std::cout << "Track covariances before MCS:";
+  //newParamCov.Print();
+
+  newParamCov(0, 0) += sigmathetasq * F * F;
+
+  newParamCov(0, 1) += sigmathetasq * F * G;
+  newParamCov(1, 0) += sigmathetasq * F * G;
+
+  newParamCov(1, 1) += sigmathetasq * G * G;
+
+  newParamCov(2, 0) += sigmathetasq * F;
+  newParamCov(0, 2) += sigmathetasq * F;
+
+  newParamCov(2, 1) += sigmathetasq * G;
+  newParamCov(1, 2) += sigmathetasq * G;
+
+  newParamCov(2, 2) += sigmathetasq;
+
+  newParamCov(3, 0) += sigmathetasq * A * F;
+  newParamCov(0, 3) += sigmathetasq * A * F;
+
+  newParamCov(3, 1) += sigmathetasq * A * G;
+  newParamCov(1, 3) += sigmathetasq * A * G;
+
+  newParamCov(3, 2) += sigmathetasq * A;
+  newParamCov(2, 3) += sigmathetasq * A;
+
+  newParamCov(3, 3) += sigmathetasq * A * A;
+
+  newParamCov(4, 0) += sigmathetasq * F * H;
+  newParamCov(0, 4) += sigmathetasq * F * H;
+
+  newParamCov(4, 1) += sigmathetasq * G * H;
+  newParamCov(1, 4) += sigmathetasq * G * H;
+
+  newParamCov(4, 2) += sigmathetasq * H;
+  newParamCov(2, 4) += sigmathetasq * H;
+
+  newParamCov(4, 3) += sigmathetasq * A * H;
+  newParamCov(3, 4) += sigmathetasq * A * H;
+
+  newParamCov(4, 4) += sigmathetasq * tanl0 * tanl0 * invqpt0 * invqpt0;
+
+  //std::cout << "Track covariances after MCS:";
+  //newParamCov.Print();
+  //std::cout << " **********************************************************\n";
 
   // Set new covariances
   trackParam->setCovariances(newParamCov);
