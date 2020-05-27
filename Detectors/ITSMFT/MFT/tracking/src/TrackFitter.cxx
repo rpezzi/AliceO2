@@ -232,6 +232,8 @@ bool TrackFitter::addCluster(const TrackParamMFT& startingParam, const o2::itsmf
   /// Recompute the parameters adding the cluster constraint with the Kalman filter
   /// Returns false in case of failure
 
+  auto& mftTrackingParam = MFTTrackingParam::Instance();
+
   if (cl.getZ() <= startingParam.getZ()) {
     LOG(INFO) << "AddCluster ERROR: The new cluster must be upstream! Bug on TrackFinder. ";
     return false;
@@ -259,7 +261,7 @@ bool TrackFitter::addCluster(const TrackParamMFT& startingParam, const o2::itsmf
   // Number of disks crossed by this tracklet
   int NDisksMS = (startingLayerID % 2 == 0) ? (startingLayerID - newLayerID) / 2 : (startingLayerID - newLayerID + 1) / 2;
 
-  double MFTDiskThicknessInX0 = 0.0082;
+  double MFTDiskThicknessInX0 = mftTrackingParam.MFTRadLenghts / 5.0;
   std::cout << "startingLayerID = " << startingLayerID << std::endl;
   std::cout << "newLayerID = " << newLayerID << std::endl;
   std::cout << "cl.getZ() = " << cl.getZ() << std::endl;
@@ -268,7 +270,7 @@ bool TrackFitter::addCluster(const TrackParamMFT& startingParam, const o2::itsmf
   std::cout << "NDisksMS = " << NDisksMS << std::endl;
 
   // Add MCS effects
-  if (NDisksMS != 0)
+  if ((NDisksMS * MFTDiskThicknessInX0) != 0)
     mTrackExtrap.addMCSEffect(&param, dZ, NDisksMS * MFTDiskThicknessInX0);
 
   // reset propagator for smoother
