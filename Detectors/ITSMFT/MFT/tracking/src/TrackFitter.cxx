@@ -145,7 +145,7 @@ void TrackFitter::initTrack(const o2::itsmft::Cluster& cl, TrackParamMFT& param)
   double sigmay0sq = cl.getSigmaY2(); // FIXME: from cluster
   double sigmaDeltaZsq = 5.0;         // Primary vertex distribution: beam interaction diamond
   double sigmaboost = mftTrackingParam.sigmaboost; // Boost q/pt seed covariances
-  double seedH_k = mftTrackingParam.sigmaboost;    // SeedH constant
+  double seedH_k = mftTrackingParam.seedH_k;    // SeedH constant
 
   param.setX(cl.getX());
   param.setY(cl.getY());
@@ -251,7 +251,7 @@ bool TrackFitter::addCluster(const TrackParamMFT& startingParam, const o2::itsmf
   int startingLayerID, newLayerID;
 
   double dZ = TMath::Abs(cl.getZ() - startingParam.getZ());
-  //LayerId of each cluster from ZPosition
+  //LayerID of each cluster from ZPosition // TODO: Use ChipMapping
   for (auto layer = 10; layer--;)
     if (startingParam.getZ() < LayerZPosition[layer] + .3 & startingParam.getZ() > LayerZPosition[layer] - .3)
       startingLayerID = layer;
@@ -262,16 +262,17 @@ bool TrackFitter::addCluster(const TrackParamMFT& startingParam, const o2::itsmf
   int NDisksMS = (startingLayerID % 2 == 0) ? (startingLayerID - newLayerID) / 2 : (startingLayerID - newLayerID + 1) / 2;
 
   double MFTDiskThicknessInX0 = mftTrackingParam.MFTRadLenghts / 5.0;
-  std::cout << "startingLayerID = " << startingLayerID << std::endl;
-  std::cout << "newLayerID = " << newLayerID << std::endl;
-  std::cout << "cl.getZ() = " << cl.getZ() << std::endl;
-  std::cout << "startingParam.getZ() = " << startingParam.getZ() << std::endl;
-  //  std::cout << " = " <<  << std::endl;
-  std::cout << "NDisksMS = " << NDisksMS << std::endl;
+  if (mVerbose) {
+    std::cout << "startingLayerID = " << startingLayerID << " ; "
+              << "newLayerID = " << newLayerID << " ; ";
+    std::cout << "cl.getZ() = " << cl.getZ() << " ; ";
+    std::cout << "startingParam.getZ() = " << startingParam.getZ() << " ; ";
+    std::cout << "NDisksMS = " << NDisksMS << std::endl;
+  }
 
   // Add MCS effects
   if ((NDisksMS * MFTDiskThicknessInX0) != 0)
-    mTrackExtrap.addMCSEffect(&param, dZ, NDisksMS * MFTDiskThicknessInX0);
+    mTrackExtrap.addMCSEffect(&param, -1, NDisksMS * MFTDiskThicknessInX0);
 
   // reset propagator for smoother
   if (mSmooth) {
