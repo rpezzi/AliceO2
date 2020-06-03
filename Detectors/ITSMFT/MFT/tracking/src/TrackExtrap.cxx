@@ -318,14 +318,14 @@ void TrackExtrap::extrapToZCov(TrackParamMFT* trackParam, double zEnd, bool upda
 }
 
 //__________________________________________________________________________
-void TrackExtrap::addMCSEffect(TrackParamMFT* trackParam, double dZ, double x0, bool isFieldON)
+void TrackExtrap::addMCSEffect(TrackParamMFT* trackParam, double dZ, double x0)
 {
   /// Add to the track parameter covariances the effects of multiple Coulomb scattering
   /// through a material of thickness "abs(dZ)" and of radiation length "x0"
   /// assuming linear propagation and using the small angle approximation.
-  /// dZ = zOut - zIn (sign is important) and "param" is assumed to be given zOut.
-  /// If x0 <= 0., assume dZ = pathLength/x0 and consider the material thickness as negligible.
+  /// All scattering evaluated happens at the position of the first cluster
 
+  bool debug = false;
   double phi0 = trackParam->getPhi();
   double tanl0 = trackParam->getTanl();
   double invtanl0 = 1.0 / tanl0;
@@ -335,15 +335,6 @@ void TrackExtrap::addMCSEffect(TrackParamMFT* trackParam, double dZ, double x0, 
   double cosphi0, sinphi0;
   o2::utils::sincos(phi0, sinphi0, cosphi0);
 
-  double A = tanl0 * tanl0 + 1;
-  double B = dZ * cosphi0 * invtanl0;
-  double C = dZ * sinphi0 * invtanl0;
-  double D = A * B * invtanl0;
-  double E = -A * C * invtanl0;
-  double F = -C - D;
-  double G = B + E;
-  double H = -invqpt0 * tanl0;
-
   double csclambda = TMath::Abs(TMath::Sqrt(1 + tanl0 * tanl0) * invtanl0);
   double pathLengthOverX0 = x0 * csclambda;
 
@@ -351,65 +342,88 @@ void TrackExtrap::addMCSEffect(TrackParamMFT* trackParam, double dZ, double x0, 
   double sigmathetasq = 0.0136 * invqpt0 * (1 + 0.038 * TMath::Log(pathLengthOverX0));
   sigmathetasq *= sigmathetasq * pathLengthOverX0;
 
-  //std::cout << "phi0 = " << phi0  << std::endl;
-  //std::cout << "tanl0 = " << tanl0  << std::endl;
-  //std::cout << "invtanl0 = " << invtanl0 << std::endl;
-  //std::cout << "p = " << p  << std::endl;
-  //std::cout << "csclambda = " << csclambda  << std::endl;
-  //std::cout << "pathLengthOverX0 = " << pathLengthOverX0  << std::endl;
-  //std::cout << "dZ = " << dZ  << std::endl;
-  //std::cout << "x0 = " << x0  << std::endl;
-  //std::cout << "sigmathetasq = " << sigmathetasq << std::endl;
-
-  // Set MCS covariance matrix
+  // Get covariance matrix
   TMatrixD newParamCov(trackParam->getCovariances());
+  if (debug) {
+    std::cout << "Track covariances before MCS:";
+    newParamCov.Print();
+  }
 
-  //  std::cout << "Track covariances before MCS:";
-  //newParamCov.Print();
+  if (dZ > 0) {
+    double A = tanl0 * tanl0 + 1;
+    double B = dZ * cosphi0 * invtanl0;
+    double C = dZ * sinphi0 * invtanl0;
+    double D = A * B * invtanl0;
+    double E = -A * C * invtanl0;
+    double F = -C - D;
+    double G = B + E;
+    double H = -invqpt0 * tanl0;
 
-  newParamCov(0, 0) += sigmathetasq * F * F;
+    newParamCov(0, 0) += sigmathetasq * F * F;
 
-  newParamCov(0, 1) += sigmathetasq * F * G;
-  newParamCov(1, 0) += sigmathetasq * F * G;
+    newParamCov(0, 1) += sigmathetasq * F * G;
+    newParamCov(1, 0) += sigmathetasq * F * G;
 
-  newParamCov(1, 1) += sigmathetasq * G * G;
+    newParamCov(1, 1) += sigmathetasq * G * G;
 
-  newParamCov(2, 0) += sigmathetasq * F;
-  newParamCov(0, 2) += sigmathetasq * F;
+    newParamCov(2, 0) += sigmathetasq * F;
+    newParamCov(0, 2) += sigmathetasq * F;
 
-  newParamCov(2, 1) += sigmathetasq * G;
-  newParamCov(1, 2) += sigmathetasq * G;
+    newParamCov(2, 1) += sigmathetasq * G;
+    newParamCov(1, 2) += sigmathetasq * G;
 
-  newParamCov(2, 2) += sigmathetasq;
+    newParamCov(2, 2) += sigmathetasq;
 
-  newParamCov(3, 0) += sigmathetasq * A * F;
-  newParamCov(0, 3) += sigmathetasq * A * F;
+    newParamCov(3, 0) += sigmathetasq * A * F;
+    newParamCov(0, 3) += sigmathetasq * A * F;
 
-  newParamCov(3, 1) += sigmathetasq * A * G;
-  newParamCov(1, 3) += sigmathetasq * A * G;
+    newParamCov(3, 1) += sigmathetasq * A * G;
+    newParamCov(1, 3) += sigmathetasq * A * G;
 
-  newParamCov(3, 2) += sigmathetasq * A;
-  newParamCov(2, 3) += sigmathetasq * A;
+    newParamCov(3, 2) += sigmathetasq * A;
+    newParamCov(2, 3) += sigmathetasq * A;
 
-  newParamCov(3, 3) += sigmathetasq * A * A;
+    newParamCov(3, 3) += sigmathetasq * A * A;
 
-  newParamCov(4, 0) += sigmathetasq * F * H;
-  newParamCov(0, 4) += sigmathetasq * F * H;
+    newParamCov(4, 0) += sigmathetasq * F * H;
+    newParamCov(0, 4) += sigmathetasq * F * H;
 
-  newParamCov(4, 1) += sigmathetasq * G * H;
-  newParamCov(1, 4) += sigmathetasq * G * H;
+    newParamCov(4, 1) += sigmathetasq * G * H;
+    newParamCov(1, 4) += sigmathetasq * G * H;
 
-  newParamCov(4, 2) += sigmathetasq * H;
-  newParamCov(2, 4) += sigmathetasq * H;
+    newParamCov(4, 2) += sigmathetasq * H;
+    newParamCov(2, 4) += sigmathetasq * H;
 
-  newParamCov(4, 3) += sigmathetasq * A * H;
-  newParamCov(3, 4) += sigmathetasq * A * H;
+    newParamCov(4, 3) += sigmathetasq * A * H;
+    newParamCov(3, 4) += sigmathetasq * A * H;
 
-  newParamCov(4, 4) += sigmathetasq * tanl0 * tanl0 * invqpt0 * invqpt0;
+    newParamCov(4, 4) += sigmathetasq * tanl0 * tanl0 * invqpt0 * invqpt0;
+  } else {
 
-  //std::cout << "Track covariances after MCS:";
-  //newParamCov.Print();
-  //std::cout << " **********************************************************\n";
+    double A = tanl0 * tanl0 + 1;
+    double H = -invqpt0 * tanl0;
+
+    newParamCov(2, 2) += sigmathetasq;
+
+    newParamCov(3, 2) += sigmathetasq * A;
+    newParamCov(2, 3) += sigmathetasq * A;
+
+    newParamCov(3, 3) += sigmathetasq * A * A;
+
+    newParamCov(4, 2) += sigmathetasq * H;
+    newParamCov(2, 4) += sigmathetasq * H;
+
+    newParamCov(4, 3) += sigmathetasq * A * H;
+    newParamCov(3, 4) += sigmathetasq * A * H;
+
+    newParamCov(4, 4) += sigmathetasq * tanl0 * tanl0 * invqpt0 * invqpt0;
+  }
+
+  if (debug) {
+    std::cout << "Track covariances after MCS:";
+    newParamCov.Print();
+    std::cout << " **********************************************************\n";
+  }
 
   // Set new covariances
   trackParam->setCovariances(newParamCov);
