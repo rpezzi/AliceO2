@@ -122,7 +122,7 @@ void TrackExtrap::quadraticExtrapToZ(TrackParamMFT* trackParam, double zEnd)
 
   double x = x0 + deltax;
   double y = y0 + deltay;
-  double phi = phi0 + theta;
+  double phi = phi0 + Hz * theta;
 
   trackParam->setX(x);
   trackParam->setY(y);
@@ -161,7 +161,7 @@ void TrackExtrap::helixExtrapToZ(TrackParamMFT* trackParam, double zEnd)
 
   double x = x0 + deltax;
   double y = y0 + deltay;
-  double phi = trackParam->getPhi() + theta;
+  double phi = trackParam->getPhi() + Hz * theta;
 
   trackParam->setX(x);
   trackParam->setY(y);
@@ -198,8 +198,8 @@ void TrackExtrap::quadraticExtrapToZCov(TrackParamMFT* trackParam, double zEnd, 
   jacob(1, 2) = -n * theta * 0.5 * Hz * sinphi0 + n * cosphi0;
   jacob(1, 3) = -Hz * m * theta * cosphi0 - m * sinphi0;
   jacob(1, 4) = -k * m * 0.5 * Hz * dZ * cosphi0;
-  jacob(2, 3) = -theta * invtanl0;
-  jacob(2, 4) = -k * n;
+  jacob(2, 3) = -Hz * theta * invtanl0;
+  jacob(2, 4) = -Hz * k * n;
 
   // Extrapolate track parameter covariances to "zEnd"
   TMatrixD tmp(trackParam->getCovariances(), TMatrixD::kMultTranspose, jacob);
@@ -261,8 +261,8 @@ void TrackExtrap::helixExtrapToZCov(TrackParamMFT* trackParam, double zEnd, bool
   jacob(1, 2) = Hz * Y - Hz * YC - XS;
   jacob(0, 3) = -Hz * O * m - P * m;
   jacob(0, 4) = -Hz * N * O - Hz * T * X + Hz * V * X + N * P + U * Y;
-  jacob(2, 3) = -theta * invtanl0;
-  jacob(2, 4) = -k * n;
+  jacob(2, 3) = -Hz * theta * invtanl0;
+  jacob(2, 4) = -Hz * k * n;
 
   // Extrapolate track parameter covariances to "zEnd"
   TMatrixD tmp(trackParam->getCovariances(), TMatrixD::kMultTranspose, jacob);
