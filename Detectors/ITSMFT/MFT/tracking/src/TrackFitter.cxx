@@ -129,52 +129,66 @@ void TrackFitter::initTrack(const o2::itsmft::Cluster& cl, TrackParamMFT& param)
 
   auto& mftTrackingParam = MFTTrackingParam::Instance();
 
-  // compute the track parameters at the last cluster
+  auto Hz = std::copysign(1, mBZField);
+  double k = TMath::Abs(o2::constants::math::B2C * mBZField);
+
+  // compute the trac parameters at the last cluster
   double x0 = cl.getX();
   double y0 = cl.getY();
   double z0 = cl.getZ();
+  double z0sq = z0 * z0;
+
   double pt = TMath::Sqrt(x0 * x0 + y0 * y0);
+  double invqpt = 1.0 / pt;
+
   double pz = z0;
   double phi0 = TMath::ATan2(cl.getY(), cl.getX());
   double tanl = pz / pt;
-  double r0sq = cl.getX() * cl.getX() + cl.getY() * cl.getY();
-  double r0cu = r0sq * TMath::Sqrt(r0sq);
-  double invr0sq = 1.0 / r0sq;
-  double invr0cu = 1.0 / r0cu;
-  double sigmax0sq = cl.getSigmaZ2(); // FIXME: from cluster
-  double sigmay0sq = cl.getSigmaY2(); // FIXME: from cluster
-  double sigmaDeltaZsq = 5.0;         // Primary vertex distribution: beam interaction diamond
+  //double r0sq = cl.getX() * cl.getX() + cl.getY() * cl.getY();
+  //double r0cu = r0sq * TMath::Sqrt(r0sq);
+  //double invr0sq = 1.0 / r0sq;
+  //double invr0cu = 1.0 / r0cu;
+  double seedH_k = mftTrackingParam.seedH_k;       // SeedH constant
   double sigmaboost = mftTrackingParam.sigmaboost; // Boost q/pt seed covariances
-  double seedH_k = mftTrackingParam.seedH_k;    // SeedH constant
 
-  param.setX(cl.getX());
-  param.setY(cl.getY());
-  param.setZ(cl.getZ());
-  param.setPhi(phi0);
-  param.setTanl(tanl);
 
   // Configure the track seed
   switch (mftTrackingParam.seed) {
     case AB:
       if (mVerbose)
-        std::cout << " Init track with Seed A / B; sigmaboost = " << sigmaboost << ".\n";
-      param.setInvQPt(1.0 / pt); // Seeds A & B
+        std::cout << " Init track with Seed A / B; sigmaboost = " << sigmaboost << ".\n"; // keep invqpt
       break;
     case CE:
       if (mVerbose)
         std::cout << " Init track with Seed C / E; sigmaboost = " << sigmaboost << ".\n";
-      param.setInvQPt(std::copysign(1.0, param.getInvQPt()) / pt); // Seeds C & E
+      invqpt = std::copysign(invqpt, param.getInvQPt()); // Seeds C & E
       break;
     case DH:
       if (mVerbose)
         std::cout << " Init track with Seed H; (k = " << seedH_k << "); sigmaboost = " << sigmaboost << ".\n";
-      param.setInvQPt(param.getInvQPt() / seedH_k); // SeedH
+      invqpt /= seedH_k; // SeedH
       break;
     default:
       if (mVerbose)
-        std::cout << " Init track with Seed D.\n";
+        std::cout << " Init track with Seed AB.\n";
       break;
   }
+
+  pt = TMath::Abs(1.0 / invqpt);
+  double invpt = 1.0 / pt;
+  double ptsq = pt * pt;
+  double invptsq = 1.0 / ptsq;
+  double invptcu = invptsq * invpt;
+  double invtanl = 1.0 / tanl;
+  double tanlsq = tanl * tanl;
+  double invtanlsq = 1.0 / tanlsq;
+
+  param.setInvQPt(invqpt);
+  param.setX(cl.getX());
+  param.setY(cl.getY());
+  param.setZ(cl.getZ());
+  param.setPhi(phi0);
+  param.setTanl(tanl);
 
   if (mVerbose) {
     auto model = mftTrackingParam.trackmodel == Helix ? "Helix" : "Quadratic";
@@ -184,27 +198,35 @@ void TrackFitter::initTrack(const o2::itsmft::Cluster& cl, TrackParamMFT& param)
   }
 
   // compute the track parameter covariances at the last cluster (as if the other clusters did not exist)
+
+  double sigmax0sq = cl.getSigmaZ2(); // FIXME: from cluster
+  double sigmay0sq = cl.getSigmaY2(); // FIXME: from cluster
+  double sigmaDeltaZsq = 5.0;         // Primary vertex distribution: beam interaction diamond
+  double sigmapt0sq = 4.0 * ptsq;
+  //double sigmaz0sq =
+  double sigmatanlsq = sigmaDeltaZsq * invptsq;
+
   TMatrixD lastParamCov(5, 5);
   lastParamCov.Zero();
   lastParamCov(0, 0) = sigmaboost * sigmax0sq;      // <X,X>
   lastParamCov(0, 1) = 0;                           // <Y,X>
-  lastParamCov(0, 2) = sigmaboost * -sigmax0sq * y0 * invr0sq;      // <PHI,X>
-  lastParamCov(0, 3) = sigmaboost * -z0 * sigmax0sq * x0 * invr0cu; // <TANL,X>
-  lastParamCov(0, 4) = sigmaboost * -x0 * sigmax0sq * invr0cu;      // <INVQPT,X>
+  lastParamCov(0, 2) = sigmaboost * -sigmax0sq * y0 * invptsq;      // <PHI,X>
+  lastParamCov(0, 3) = sigmaboost * -z0 * sigmax0sq * x0 * invptcu; // <TANL,X>
+  lastParamCov(0, 4) = 0;                                           //sigmaboost * -x0 * sigmax0sq * invr0cu;      // <INVQPT,X>
 
   lastParamCov(1, 1) = sigmaboost * sigmay0sq;                      // <Y,Y>
-  lastParamCov(1, 2) = sigmaboost * sigmay0sq * x0 * invr0sq;       // <PHI,Y>
-  lastParamCov(1, 3) = sigmaboost * -z0 * sigmay0sq * y0 * invr0cu; // <TANL,Y>
-  lastParamCov(1, 4) = sigmaboost * y0 * sigmay0sq * invr0cu;       //1e-2; // <INVQPT,Y>
+  lastParamCov(1, 2) = sigmaboost * sigmay0sq * x0 * invptsq;       // <PHI,Y>
+  lastParamCov(1, 3) = sigmaboost * -z0 * sigmay0sq * y0 * invptcu; // <TANL,Y>
+  lastParamCov(1, 4) = 0;                                           //sigmaboost * y0 * sigmay0sq * invr0cu;       //1e-2; // <INVQPT,Y>
 
-  lastParamCov(2, 2) = sigmaboost * (sigmax0sq * y0 * y0 + sigmay0sq * x0 * x0) * invr0sq * invr0sq; // <PHI,PHI>
-  lastParamCov(2, 3) = sigmaboost * z0 * x0 * y0 * (sigmax0sq - sigmay0sq) * invr0sq * invr0cu;      //  <TANL,PHI>
-  lastParamCov(2, 4) = sigmaboost * y0 * x0 * invr0cu * invr0sq * (sigmax0sq - sigmay0sq);           //  <INVQPT,PHI>
+  lastParamCov(2, 2) = sigmaboost * Hz * k * k * invptsq * invptsq * invtanlsq * invtanlsq * (sigmapt0sq * tanlsq * z0sq + sigmaDeltaZsq * (ptsq * tanlsq + z0sq)); // <PHI,PHI>
+  lastParamCov(2, 3) = sigmaboost * -Hz * sigmaDeltaZsq * k * invqpt * invpt * invtanl;                                                                             //  <TANL,PHI>
+  lastParamCov(2, 4) = sigmaboost * -Hz * sigmapt0sq * k * z0 * invptsq * invptsq * invtanl;                                                                        //  <INVQPT,PHI>
 
-  lastParamCov(3, 3) = sigmaboost * z0 * z0 * (sigmax0sq * x0 * x0 + sigmay0sq * y0 * y0) * invr0cu * invr0cu + sigmaDeltaZsq * invr0sq; // <TANL,TANL>
-  lastParamCov(3, 4) = sigmaboost * z0 * invr0cu * invr0cu * (sigmax0sq * x0 * x0 + sigmay0sq * y0 * y0);                                // <INVQPT,TANL>
+  lastParamCov(3, 3) = sigmaboost * sigmatanlsq; // <TANL,TANL>
+  lastParamCov(3, 4) = 0;                        // <INVQPT,TANL>
 
-  lastParamCov(4, 4) = sigmaboost * sigmaboost * (sigmax0sq * x0 * x0 + sigmay0sq * y0 * y0) * invr0cu * invr0cu; // <INVQPT,INVQPT>
+  lastParamCov(4, 4) = sigmaboost * sigmaboost * sigmapt0sq * invptsq * invptsq; // <INVQPT,INVQPT>
 
   lastParamCov(1, 0) = lastParamCov(0, 1); //
   lastParamCov(2, 0) = lastParamCov(0, 2); //
