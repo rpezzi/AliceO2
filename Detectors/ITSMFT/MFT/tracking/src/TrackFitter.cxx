@@ -150,6 +150,7 @@ void TrackFitter::initTrack(const o2::itsmft::Cluster& cl, TrackParamMFT& param)
   //double invr0cu = 1.0 / r0cu;
   double seedH_k = mftTrackingParam.seedH_k;       // SeedH constant
   double sigmaboost = mftTrackingParam.sigmaboost; // Boost q/pt seed covariances
+  double sigmapt0sq;
 
 
   // Configure the track seed
@@ -157,20 +158,22 @@ void TrackFitter::initTrack(const o2::itsmft::Cluster& cl, TrackParamMFT& param)
     case AB:
       if (mVerbose)
         std::cout << " Init track with Seed A / B; sigmaboost = " << sigmaboost << ".\n"; // keep invqpt
+        sigmapt0sq = 1000 * pt * pt;
       break;
     case CE:
       if (mVerbose)
         std::cout << " Init track with Seed C / E; sigmaboost = " << sigmaboost << ".\n";
-      invqpt = std::copysign(invqpt, param.getInvQPt()); // Seeds C & E
+        invqpt = std::copysign(invqpt, param.getInvQPt()); // Seeds C & E
+        sigmapt0sq = 1000 * pt * pt;
       break;
     case DH:
       if (mVerbose)
         std::cout << " Init track with Seed H; (k = " << seedH_k << "); sigmaboost = " << sigmaboost << ".\n";
-      invqpt /= seedH_k; // SeedH
+        invqpt = param.getInvQPt() / seedH_k; // SeedH
+        sigmapt0sq = 1.0 / invqpt / invqpt;
       break;
     default:
-      if (mVerbose)
-        std::cout << " Init track with Seed AB.\n";
+        LOG(ERROR) << "Invalid MFT tracking seed configuraion.";
       break;
   }
 
@@ -202,7 +205,6 @@ void TrackFitter::initTrack(const o2::itsmft::Cluster& cl, TrackParamMFT& param)
   double sigmax0sq = cl.getSigmaZ2(); // FIXME: from cluster
   double sigmay0sq = cl.getSigmaY2(); // FIXME: from cluster
   double sigmaDeltaZsq = 5.0;         // Primary vertex distribution: beam interaction diamond
-  double sigmapt0sq = 4.0 * ptsq;
   //double sigmaz0sq =
   double sigmatanlsq = sigmaDeltaZsq * invptsq;
 
