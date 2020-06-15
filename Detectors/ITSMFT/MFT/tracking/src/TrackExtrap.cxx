@@ -147,7 +147,6 @@ void TrackExtrap::helixExtrapToZ(TrackParamMFT* trackParam, double zEnd)
   double px0 = trackParam->getPx();
   double py0 = trackParam->getPy();
   double invtanl0 = 1.0 / trackParam->getTanl();
-  ;
   double invqpt0 = trackParam->getInvQPt();
   auto q = trackParam->getCharge();
   auto Hz = getSignBz();
@@ -259,8 +258,8 @@ void TrackExtrap::helixExtrapToZCov(TrackParamMFT* trackParam, double zEnd, bool
   jacob(0, 3) = Hz * R * m - S * m;
   jacob(0, 4) = -Hz * N * R + Hz * T * Y - Hz * V * Y + N * S + U * X;
   jacob(1, 2) = Hz * Y - Hz * YC - XS;
-  jacob(0, 3) = -Hz * O * m - P * m;
-  jacob(0, 4) = -Hz * N * O - Hz * T * X + Hz * V * X + N * P + U * Y;
+  jacob(1, 3) = -Hz * O * m - P * m;
+  jacob(1, 4) = Hz * N * O - Hz * T * X + Hz * V * X + N * P + U * Y;
   jacob(2, 3) = -Hz * theta * invtanl0;
   jacob(2, 4) = -Hz * k * n;
 
