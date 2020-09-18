@@ -164,30 +164,15 @@ bool TrackFitter::initTrack(TrackLTF& track, bool outward)
   auto A = TMath::Sqrt(track.getInvQPt() * track.getInvQPt() * deltaR2 * k2 + 1);
   auto A2 = A * A;
   auto B = A + 1.0;
-  auto B2 = B * B;
   auto B3 = B * B * B;
   auto B12 = TMath::Sqrt(B);
   auto B32 = B * B12;
-  auto B52 = B * B32;
   auto C = invQPt0 * k;
   auto C2 = C * C;
-  auto C3 = C * C2;
-  auto D = 1.0 / (A2 * B2 * B2 * deltaR4);
+  auto D = 1.0 / (A2 * B3 * B * deltaR4);
   auto E = D * deltaZ / (B * deltaR);
-  auto F = deltaR * deltaX * C3 * Hz / (A * B32);
-  auto G = 0.5 * TMath::Sqrt2() * A * B32 * C * Hz * deltaR;
-  auto Gx = G * deltaX;
-  auto Gy = G * deltaY;
-  auto H = -0.25 * TMath::Sqrt2() * B12 * C3 * Hz * deltaR3;
-  auto Hx = H * deltaX;
-  auto Hy = H * deltaY;
-  auto I = A * B2;
-  auto Ix = I * deltaX;
-  auto Iy = I * deltaY;
   auto J = 2 * B * deltaR3 * deltaR3 * k2;
   auto K = 0.5 * A * B - 0.25 * C2 * deltaR2;
-  auto L0 = Gx + Hx + Iy;
-  auto M0 = -Gy - Hy + Ix;
   auto N = -0.5 * B3 * C * Hz * deltaR3 * deltaR4 * k2;
   auto O = 0.125 * C2 * deltaR4 * deltaR4 * k2;
   auto P = -K * k * Hz * deltaR / A;
@@ -206,12 +191,12 @@ bool TrackFitter::initTrack(TrackLTF& track, bool outward)
   lastParamCov(1, 3) = 0;         // <TANL,Y>
   lastParamCov(1, 4) = 0;         // <INVQPT,Y>
 
-  lastParamCov(2, 2) = D * (J * K * K * sigmainvQPtsq + L0 * L0 * sigmaDeltaXsq + M0 * M0 * sigmaDeltaYsq); // <PHI,PHI>
-  lastParamCov(2, 3) = E * K * (TMath::Sqrt2() * B52 * (L0 * deltaX * sigmaDeltaXsq - deltaY * sigmaDeltaYsq * M0) + N * sigmainvQPtsq); //  <TANL,PHI>
+  lastParamCov(2, 2) = D * J * K * K * sigmainvQPtsq;            // <PHI,PHI>
+  lastParamCov(2, 3) = E * K * N * sigmainvQPtsq;                //  <TANL,PHI>
   lastParamCov(2, 4) = P * sigmainvQPtsq * TMath::Sqrt2() / B32; //  <INVQPT,PHI>
 
-  lastParamCov(3, 3) = Q * (2 * K * K * (deltaX * deltaX * sigmaDeltaXsq + deltaY * deltaY * sigmaDeltaYsq) + O * sigmainvQPtsq); // <TANL,TANL>
-  lastParamCov(3, 4) = R * sigmainvQPtsq; // <INVQPT,TANL>
+  lastParamCov(3, 3) = Q * O * sigmainvQPtsq; // <TANL,TANL>
+  lastParamCov(3, 4) = R * sigmainvQPtsq;     // <INVQPT,TANL>
 
   lastParamCov(4, 4) = sigmainvQPtsq; // <INVQPT,INVQPT>
 
