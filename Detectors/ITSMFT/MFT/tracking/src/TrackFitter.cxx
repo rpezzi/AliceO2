@@ -100,20 +100,19 @@ bool TrackFitter::initTrack(TrackLTF& track, bool outward)
   // initialize the starting track parameters and cluster
   double sigmainvQPtsq;
   double chi2invqptquad;
-  double invQPtSeed;
+  auto invQPt0 = invQPtFromFCF(track, mBZField, sigmainvQPtsq);
   auto nPoints = track.getNumberOfPoints();
   auto k = TMath::Abs(o2::constants::math::B2C * mBZField);
   auto Hz = std::copysign(1, mBZField);
-  invQPtSeed = invQPtFromFCF(track, mBZField, sigmainvQPtsq);
 
   if (mftTrackingParam.verbose) {
     std::cout << "\n ***************************** Start Fitting new track ***************************** \n";
     std::cout << "N Clusters = " << nPoints << std::endl;
   }
 
-  track.setInvQPtSeed(invQPtSeed);
+  track.setInvQPtSeed(invQPt0);
   track.setChi2QPtSeed(chi2invqptquad);
-  track.setInvQPt(invQPtSeed);
+  track.setInvQPt(invQPt0);
 
   /// Compute the initial track parameters to seed the Kalman filter
 
@@ -134,9 +133,9 @@ bool TrackFitter::initTrack(TrackLTF& track, bool outward)
   auto deltaY = track.getYCoordinates()[nPoints - 1] - track.getYCoordinates()[0];
   auto deltaZ = track.getZCoordinates()[nPoints - 1] - track.getZCoordinates()[0];
   auto deltaR = TMath::Sqrt(deltaX * deltaX + deltaY * deltaY);
-  auto tanl = 0.5 * TMath::Sqrt2() * (deltaZ / deltaR) *
-              TMath::Sqrt(TMath::Sqrt((invQPtSeed * deltaR * k) * (invQPtSeed * deltaR * k) + 1) + 1);
-  auto phi0 = TMath::ATan2(deltaY, deltaX) - 0.5 * Hz * invQPtSeed * deltaZ * k / tanl;
+  auto tanl0 = 0.5 * TMath::Sqrt2() * (deltaZ / deltaR) *
+               TMath::Sqrt(TMath::Sqrt((invQPt0 * deltaR * k) * (invQPt0 * deltaR * k) + 1) + 1);
+  auto phi0 = TMath::ATan2(deltaY, deltaX) - 0.5 * Hz * invQPt0 * deltaZ * k / tanl0;
   auto sigmax0sq = track.getSigmasX2()[first_cls];
   auto sigmay0sq = track.getSigmasY2()[first_cls];
   auto sigmax1sq = track.getSigmasX2()[last_cls];
@@ -148,33 +147,15 @@ bool TrackFitter::initTrack(TrackLTF& track, bool outward)
   track.setY(y0);
   track.setZ(z0);
   track.setPhi(phi0);
-  track.setTanl(tanl);
+  track.setTanl(tanl0);
 
-  // Configure the track seed
-  switch (mftTrackingParam.seed) {
-    case AB:
-      if (mftTrackingParam.verbose)
-        std::cout << " Init track with Seed A / B; " << (track.isCA() ? " CA Track " : " LTF Track") << std::endl;
-      track.setInvQPt(1.0 / TMath::Sqrt(x0 * x0 + y0 * y0)); // Seeds A & B
-      break;
-    case DH:
-      if (mftTrackingParam.verbose)
-        std::cout << " Init track with Seed H; " << (track.isCA() ? " CA Track " : " LTF Track") << std::endl;
-      track.setInvQPt(track.getInvQPt()); // SeedH
-      break;
-    default:
-      LOG(ERROR) << "Invalid MFT tracking seed";
-      return false;
-      break;
-  }
   if (mftTrackingParam.verbose) {
+    std::cout << " Init " << (track.isCA() ? "CA Track " : "LTF Track") << std::endl;
     auto model = (mftTrackingParam.trackmodel == Helix) ? "Helix" : (mftTrackingParam.trackmodel == Quadratic) ? "Quadratic" : "Linear";
     std::cout << "Track Model: " << model << std::endl;
-    std::cout << "  initTrack: X = " << x0 << " Y = " << y0 << " Z = " << z0 << " Tgl = " << track.getTanl() << "  Phi = " << track.getPhi() << " pz = " << track.getPz() << " qpt = " << 1.0 / track.getInvQPt() << std::endl;
-    std::cout << " Variances: sigma_x0 = " << TMath::Sqrt(sigmax0sq) << " sigma_y0 = " << TMath::Sqrt(sigmay0sq) << " sigma_q/pt = " << TMath::Sqrt(sigmainvQPtsq) << std::endl;
+    std::cout << "  initTrack: X = " << x0 << " Y = " << y0 << " Z = " << z0 << " Tgl = " << tanl0 << "  Phi = " << phi0 << " pz = " << track.getPz() << " qpt = " << 1.0 / track.getInvQPt() << std::endl;
+    std::cout << " Variances: sigma2_x0 = " << TMath::Sqrt(sigmax0sq) << " sigma2_y0 = " << TMath::Sqrt(sigmay0sq) << " sigma2_q/pt = " << TMath::Sqrt(sigmainvQPtsq) << std::endl;
   }
-
-  auto model = (mftTrackingParam.trackmodel == Helix) ? "Helix" : (mftTrackingParam.trackmodel == Quadratic) ? "Quadratic" : "Linear";
 
   auto deltaR2 = deltaR * deltaR;
   auto deltaR3 = deltaR2 * deltaR;
@@ -185,14 +166,14 @@ bool TrackFitter::initTrack(TrackLTF& track, bool outward)
   auto B = A + 1.0;
   auto B2 = B * B;
   auto B3 = B * B * B;
-  auto C = track.getInvQPt() * k;
+  auto B12 = TMath::Sqrt(B);
+  auto B32 = B * B12;
+  auto B52 = B * B32;
+  auto C = invQPt0 * k;
   auto C2 = C * C;
   auto C3 = C * C2;
   auto D = 1.0 / (A2 * B2 * B2 * deltaR4);
   auto E = D * deltaZ / (B * deltaR);
-  auto B12 = TMath::Sqrt(B);
-  auto B32 = B * B12;
-  auto B52 = B * B32;
   auto F = deltaR * deltaX * C3 * Hz / (A * B32);
   auto G = 0.5 * TMath::Sqrt2() * A * B32 * C * Hz * deltaR;
   auto Gx = G * deltaX;
@@ -213,7 +194,6 @@ bool TrackFitter::initTrack(TrackLTF& track, bool outward)
   auto Q = deltaZ * deltaZ / (A2 * B * deltaR3 * deltaR3);
   auto R = 0.25 * C * deltaZ * TMath::Sqrt2() * deltaR * k / (A * B12);
 
-  // compute the track parameter covariances at the last cluster (as if the other clusters did not exist)
   SMatrix55 lastParamCov;
   lastParamCov(0, 0) = sigmax0sq; // <X,X>
   lastParamCov(0, 1) = 0;         // <Y,X>
@@ -227,13 +207,10 @@ bool TrackFitter::initTrack(TrackLTF& track, bool outward)
   lastParamCov(1, 4) = 0;         // <INVQPT,Y>
 
   lastParamCov(2, 2) = D * (J * K * K * sigmainvQPtsq + L0 * L0 * sigmaDeltaXsq + M0 * M0 * sigmaDeltaYsq); // <PHI,PHI>
-
   lastParamCov(2, 3) = E * K * (TMath::Sqrt2() * B52 * (L0 * deltaX * sigmaDeltaXsq - deltaY * sigmaDeltaYsq * M0) + N * sigmainvQPtsq); //  <TANL,PHI>
-
   lastParamCov(2, 4) = P * sigmainvQPtsq * TMath::Sqrt2() / B32; //  <INVQPT,PHI>
 
   lastParamCov(3, 3) = Q * (2 * K * K * (deltaX * deltaX * sigmaDeltaXsq + deltaY * deltaY * sigmaDeltaYsq) + O * sigmainvQPtsq); // <TANL,TANL>
-
   lastParamCov(3, 4) = R * sigmainvQPtsq; // <INVQPT,TANL>
 
   lastParamCov(4, 4) = sigmainvQPtsq; // <INVQPT,INVQPT>
