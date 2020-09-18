@@ -351,7 +351,7 @@ Double_t invQPtFromFCF(const TrackLTF& track, Double_t bFieldZ, Double_t& sigmai
     vVal[i] = yVal[i + 1] * invx2y2;
     vErr[i] = std::sqrt(8. * xErr[i + 1] * xErr[i + 1] * x2 * y2 + 2. * yErr[i + 1] * yErr[i + 1] * (x2 - y2) * (x2 - y2)) * invx2y2 * invx2y2;
     u2 = uVal[i] * uVal[i];
-    fweight[i] = 1;   //. / vErr[i];
+    fweight[i] = 1. / vErr[i];
     F0 += fweight[i]; // f = fn(Hansroul) que é o peso de cada ponto Vn...inverso da incerteza?
     F1 += fweight[i] * uVal[i];
     F2 += fweight[i] * u2;
@@ -368,14 +368,14 @@ Double_t invQPtFromFCF(const TrackLTF& track, Double_t bFieldZ, Double_t& sigmai
 
   for (int j = 0; j < (nPoints - 1); j++) {
     Rn[j] = fweight[j] * (Rn_det1 - uVal[j] * Rn_det2 + uVal[j] * uVal[j] * Rn_det3);
-    SumSRn += Rn[j] * Rn[j] * vErr[j];
+    SumSRn += Rn[j] * Rn[j] * vErr[j] * vErr[j];
     SumRn += Rn[j];
 
     Pn[j] = fweight[j] * (-Pn_det1 + uVal[j] * Pn_det2 - uVal[j] * uVal[j] * Pn_det3);
-    SumSPn += Pn[j] * Pn[j] * vErr[j];
+    SumSPn += Pn[j] * Pn[j] * vErr[j] * vErr[j];
     SumUPn += uVal[j] * Pn[j];
 
-    SumRP += Rn[j] * Pn[j] * vErr[j] * vErr[j]; //falta um vErr?
+    SumRP += Rn[j] * Pn[j] * vErr[j] * vErr[j] * vErr[j];
   }
 
   Double_t invqpt_fcf;
