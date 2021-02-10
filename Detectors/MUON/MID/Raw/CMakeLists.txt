@@ -13,17 +13,15 @@ o2_add_library(
   SOURCES src/ColumnDataToLocalBoard.cxx
           src/CrateMapper.cxx
           src/CrateMasks.cxx
-          src/CRUBareDecoder.cxx
           src/Decoder.cxx
+          src/ElectronicsDelay.cxx
           src/ELinkDecoder.cxx
           src/Encoder.cxx
           src/FEEIdConfig.cxx
-          src/GBTBareDecoder.cxx
+          src/GBTDecoder.cxx
           src/GBTOutputHandler.cxx
-          src/GBTUserLogicDecoder.cxx
           src/GBTUserLogicEncoder.cxx
           src/LocalBoardRO.cxx
-          src/RawBuffer.cxx
           src/DecodedDataAggregator.cxx
           src/RawFileReader.cxx
   PUBLIC_LINK_LIBRARIES

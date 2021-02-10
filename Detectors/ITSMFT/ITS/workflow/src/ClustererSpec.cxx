@@ -20,7 +20,7 @@
 #include "ITSMFTReconstruction/ClustererParam.h"
 #include "DataFormatsITSMFT/CompCluster.h"
 #include "SimulationDataFormat/MCCompLabel.h"
-#include "SimulationDataFormat/MCTruthContainer.h"
+#include "SimulationDataFormat/ConstMCTruthContainer.h"
 #include "DataFormatsITSMFT/ROFRecord.h"
 #include "DataFormatsParameters/GRPObject.h"
 #include "ITSMFTReconstruction/DigitPixelReader.h"
@@ -52,7 +52,7 @@ void ClustererDPL::init(InitContext& ic)
   }
 
   mPatterns = !ic.options().get<bool>("no-patterns");
-  mNThreads = ic.options().get<int>("nthreads");
+  mNThreads = std::max(1, ic.options().get<int>("nthreads"));
 
   // settings for the fired pixel overflow masking
   const auto& alpParams = o2::itsmft::DPLAlpideParam<o2::detectors::DetID::ITS>::Instance();
@@ -79,22 +79,24 @@ void ClustererDPL::run(ProcessingContext& pc)
   auto digits = pc.inputs().get<gsl::span<o2::itsmft::Digit>>("digits");
   auto rofs = pc.inputs().get<gsl::span<o2::itsmft::ROFRecord>>("ROframes");
 
-  std::unique_ptr<const o2::dataformats::MCTruthContainer<o2::MCCompLabel>> labels;
   gsl::span<const o2::itsmft::MC2ROFRecord> mc2rofs;
+  gsl::span<const char> labelbuffer;
   if (mUseMC) {
-    labels = pc.inputs().get<o2::dataformats::MCTruthContainer<o2::MCCompLabel>*>("labels");
+    labelbuffer = pc.inputs().get<gsl::span<char>>("labels");
     mc2rofs = pc.inputs().get<gsl::span<o2::itsmft::MC2ROFRecord>>("MC2ROframes");
   }
+  o2::dataformats::ConstMCTruthContainerView<o2::MCCompLabel> labels(labelbuffer);
 
   LOG(INFO) << "ITSClusterer pulled " << digits.size() << " digits, in "
             << rofs.size() << " RO frames";
+  LOG(INFO) << "ITSClusterer pulled " << labels.getNElements() << " labels ";
 
   o2::itsmft::DigitPixelReader reader;
   reader.setDigits(digits);
   reader.setROFRecords(rofs);
   if (mUseMC) {
     reader.setMC2ROFRecords(mc2rofs);
-    reader.setDigitsMCTruth(labels.get());
+    reader.setDigitsMCTruth(labels.getIndexedSize() > 0 ? &labels : nullptr);
   }
   reader.init();
   auto orig = o2::header::gDataOriginITS;
@@ -152,7 +154,7 @@ DataProcessorSpec getClustererSpec(bool useMC)
       {"its-dictionary-path", VariantType::String, "", {"Path of the cluster-topology dictionary file"}},
       {"grp-file", VariantType::String, "o2sim_grp.root", {"Name of the grp file"}},
       {"no-patterns", o2::framework::VariantType::Bool, false, {"Do not save rare cluster patterns"}},
-      {"nthreads", VariantType::Int, 0, {"Number of clustering threads (<1: rely on openMP default)"}}}};
+      {"nthreads", VariantType::Int, 1, {"Number of clustering threads"}}}};
 }
 
 } // namespace its

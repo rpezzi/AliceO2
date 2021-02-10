@@ -11,6 +11,7 @@
 #include "../src/ExpressionHelpers.h"
 #include "Framework/VariantHelpers.h"
 #include "Framework/Logger.h"
+#include "Framework/RuntimeError.h"
 #include "gandiva/tree_expr_builder.h"
 #include "arrow/table.h"
 #include "fmt/format.h"
@@ -46,6 +47,13 @@ struct OpNodeHelper {
     return ColumnOperationSpec{node.op};
   }
 };
+
+struct PlaceholderNodeHelper {
+  DatumSpec operator()(PlaceholderNode node) const
+  {
+    return DatumSpec{node.value, node.type};
+  }
+};
 } // namespace
 
 std::shared_ptr<arrow::DataType> concreteArrowType(atype::type type)
@@ -59,6 +67,8 @@ std::shared_ptr<arrow::DataType> concreteArrowType(atype::type type)
       return arrow::int16();
     case atype::INT32:
       return arrow::int32();
+    case atype::INT64:
+      return arrow::int64();
     case atype::FLOAT:
       return arrow::float32();
     case atype::DOUBLE:
@@ -82,7 +92,7 @@ std::string upcastTo(atype::type f)
     case atype::DOUBLE:
       return "castFLOAT8";
     default:
-      throw std::runtime_error(fmt::format("Do not know how to cast to {}", f));
+      throw runtime_error_f("Do not know how to cast to %d", f);
   }
 }
 
@@ -107,16 +117,47 @@ std::ostream& operator<<(std::ostream& os, DatumSpec const& spec)
   return os;
 }
 
-namespace
+void updatePlaceholders(Filter& filter, InitContext& context)
 {
-/// helper struct used to parse trees
-struct NodeRecord {
-  /// pointer to the actual tree node
-  Node* node_ptr = nullptr;
-  size_t index = 0;
-  explicit NodeRecord(Node* node_, size_t index_) : node_ptr(node_), index{index_} {}
-};
-} // namespace
+  std::stack<NodeRecord> path;
+
+  // insert the top node into stack
+  path.emplace(filter.node.get(), 0);
+
+  auto updateNode = [&](Node* node) {
+    if (node->self.index() == 3) {
+      std::get_if<3>(&node->self)->reset(context);
+    }
+  };
+
+  auto isLeaf = [](Node const* const node) {
+    return ((node->left == nullptr) && (node->right == nullptr));
+  };
+
+  // while the stack is not empty
+  while (path.empty() == false) {
+    auto& top = path.top();
+
+    updateNode(top.node_ptr);
+
+    path.pop();
+
+    if (top.node_ptr->left != nullptr) {
+      if (isLeaf(top.node_ptr->left.get())) {
+        updateNode(top.node_ptr->left.get());
+      } else {
+        path.emplace(top.node_ptr->left.get(), 0);
+      }
+    }
+    if (top.node_ptr->right != nullptr) {
+      if (isLeaf(top.node_ptr->right.get())) {
+        updateNode(top.node_ptr->right.get());
+      } else {
+        path.emplace(top.node_ptr->right.get(), 0);
+      }
+    }
+  }
+}
 
 Operations createOperations(Filter const& expression)
 {
@@ -131,6 +172,7 @@ Operations createOperations(Filter const& expression)
       overloaded{
         [lh = LiteralNodeHelper{}](LiteralNode node) { return lh(node); },
         [bh = BindingNodeHelper{}](BindingNode node) { return bh(node); },
+        [ph = PlaceholderNodeHelper{}](PlaceholderNode node) { return ph(node); },
         [](auto&&) { return DatumSpec{}; }},
       node->self);
   };
@@ -165,11 +207,13 @@ Operations createOperations(Filter const& expression)
     }
 
     decltype(left) right = nullptr;
-    if (top.node_ptr->right != nullptr)
+    if (top.node_ptr->right != nullptr) {
       right = top.node_ptr->right.get();
+    }
     bool rightLeaf = true;
-    if (right != nullptr)
+    if (right != nullptr) {
       rightLeaf = isLeaf(right);
+    }
     size_t ri = 0;
     auto isUnary = false;
     if (top.node_ptr->right == nullptr) {
@@ -185,10 +229,12 @@ Operations createOperations(Filter const& expression)
     }
 
     OperationSpecs.push_back(std::move(operationSpec));
-    if (!leftLeaf)
+    if (!leftLeaf) {
       path.emplace(left, li);
-    if (!isUnary && !rightLeaf)
+    }
+    if (!isUnary && !rightLeaf) {
       path.emplace(right, ri);
+    }
   }
   // at this stage the operations vector is created, but the field types are
   // only set for the logical operations and leaf nodes
@@ -198,22 +244,25 @@ Operations createOperations(Filter const& expression)
   auto inferResultType = [&resultTypes](DatumSpec& left, DatumSpec& right) {
     // if the left datum is monostate (error)
     if (left.datum.index() == 0) {
-      throw std::runtime_error("Malformed operation spec: empty left datum");
+      throw runtime_error("Malformed operation spec: empty left datum");
     }
 
     // check if the datums are references
-    if (left.datum.index() == 1)
+    if (left.datum.index() == 1) {
       left.type = resultTypes[std::get<size_t>(left.datum)];
+    }
 
-    if (right.datum.index() == 1)
+    if (right.datum.index() == 1) {
       right.type = resultTypes[std::get<size_t>(right.datum)];
+    }
 
     auto t1 = left.type;
     auto t2 = right.type;
     // if the right datum is monostate (unary op)
     if (right.datum.index() == 0) {
-      if (t1 == atype::DOUBLE)
+      if (t1 == atype::DOUBLE) {
         return atype::DOUBLE;
+      }
       return atype::FLOAT;
     }
 
@@ -221,24 +270,29 @@ Operations createOperations(Filter const& expression)
       return t1;
     }
 
-    if (t1 == atype::INT32 || t1 == atype::INT8 || t1 == atype::INT16 || t1 == atype::UINT8) {
-      if (t2 == atype::INT32 || t2 == atype::INT8 || t2 == atype::INT16 || t2 == atype::UINT8)
+    if (t1 == atype::INT32 || t1 == atype::INT8 || t1 == atype::INT16 || t1 == atype::INT64 || t1 == atype::UINT8) {
+      if (t2 == atype::INT32 || t2 == atype::INT8 || t2 == atype::INT16 || t2 == atype::INT64 || t2 == atype::UINT8) {
         return atype::FLOAT;
-      if (t2 == atype::FLOAT)
+      }
+      if (t2 == atype::FLOAT) {
         return atype::FLOAT;
-      if (t2 == atype::DOUBLE)
+      }
+      if (t2 == atype::DOUBLE) {
         return atype::DOUBLE;
+      }
     }
     if (t1 == atype::FLOAT) {
-      if (t2 == atype::INT32 || t2 == atype::INT8 || t2 == atype::INT16 || t2 == atype::UINT8)
+      if (t2 == atype::INT32 || t2 == atype::INT8 || t2 == atype::INT16 || t2 == atype::INT64 || t2 == atype::UINT8) {
         return atype::FLOAT;
-      if (t2 == atype::DOUBLE)
+      }
+      if (t2 == atype::DOUBLE) {
         return atype::DOUBLE;
+      }
     }
     if (t1 == atype::DOUBLE) {
       return atype::DOUBLE;
     }
-    throw std::runtime_error(fmt::format("Invalid combination of argument types {} and {}", t1, t2));
+    throw runtime_error_f("Invalid combination of argument types %d and %d", t1, t2);
   };
 
   for (auto it = OperationSpecs.rbegin(); it != OperationSpecs.rend(); ++it) {
@@ -270,11 +324,10 @@ std::shared_ptr<gandiva::Filter>
   auto s = gandiva::Filter::Make(Schema,
                                  makeCondition(createExpressionTree(opSpecs, Schema)),
                                  &filter);
-  if (s.ok()) {
-    return filter;
-  } else {
-    throw std::runtime_error(fmt::format("Failed to create filter: {}", s.ToString()));
+  if (!s.ok()) {
+    throw runtime_error_f("Failed to create filter: %s", s.ToString().c_str());
   }
+  return filter;
 }
 
 std::shared_ptr<gandiva::Filter>
@@ -284,11 +337,10 @@ std::shared_ptr<gandiva::Filter>
   auto s = gandiva::Filter::Make(Schema,
                                  condition,
                                  &filter);
-  if (s.ok()) {
-    return filter;
-  } else {
-    throw std::runtime_error(fmt::format("Failed to create filter: {}", s.ToString()));
+  if (!s.ok()) {
+    throw runtime_error_f("Failed to create filter: %s", s.ToString().c_str());
   }
+  return filter;
 }
 
 std::shared_ptr<gandiva::Projector>
@@ -298,11 +350,10 @@ std::shared_ptr<gandiva::Projector>
   auto s = gandiva::Projector::Make(Schema,
                                     {makeExpression(createExpressionTree(opSpecs, Schema), result)},
                                     &projector);
-  if (s.ok()) {
-    return projector;
-  } else {
-    throw std::runtime_error(fmt::format("Failed to create projector: {}", s.ToString()));
+  if (!s.ok()) {
+    throw runtime_error_f("Failed to create projector: %s", s.ToString().c_str());
   }
+  return projector;
 }
 
 std::shared_ptr<gandiva::Projector>
@@ -318,21 +369,24 @@ Selection createSelection(std::shared_ptr<arrow::Table> table, std::shared_ptr<g
                                                arrow::default_memory_pool(),
                                                &selection);
   if (!s.ok()) {
-    throw std::runtime_error(fmt::format("Cannot allocate selection vector {}", s.ToString()));
+    throw runtime_error_f("Cannot allocate selection vector %s", s.ToString().c_str());
+  }
+  if (table->num_rows() == 0) {
+    return selection;
   }
   arrow::TableBatchReader reader(*table);
   std::shared_ptr<arrow::RecordBatch> batch;
   while (true) {
     s = reader.ReadNext(&batch);
     if (!s.ok()) {
-      throw std::runtime_error(fmt::format("Cannot read batches from table {}", s.ToString()));
+      throw runtime_error_f("Cannot read batches from table %s", s.ToString().c_str());
     }
     if (batch == nullptr) {
       break;
     }
     s = gfilter->Evaluate(*batch, selection);
     if (!s.ok()) {
-      throw std::runtime_error(fmt::format("Cannot apply filter {}", s.ToString()));
+      throw runtime_error_f("Cannot apply filter %s", s.ToString().c_str());
     }
   }
 
@@ -353,14 +407,14 @@ auto createProjection(std::shared_ptr<arrow::Table> table, std::shared_ptr<gandi
   while (true) {
     auto s = reader.ReadNext(&batch);
     if (!s.ok()) {
-      throw std::runtime_error(fmt::format("Cannot read batches from table {}", s.ToString()));
+      throw runtime_error_f("Cannot read batches from table %s", s.ToString().c_str());
     }
     if (batch == nullptr) {
       break;
     }
     s = gprojector->Evaluate(*batch, arrow::default_memory_pool(), v.get());
     if (!s.ok()) {
-      throw std::runtime_error(fmt::format("Cannot apply projector {}", s.ToString()));
+      throw runtime_error_f("Cannot apply projector %s", s.ToString().c_str());
     }
   }
   return v;
@@ -384,15 +438,25 @@ gandiva::NodePtr createExpressionTree(Operations const& opSpecs,
 
     if (spec.datum.index() == 2) {
       auto content = std::get<LiteralNode::var_t>(spec.datum);
-      if (content.index() == 0)
+      if (content.index() == 0) {
         return gandiva::TreeExprBuilder::MakeLiteral(static_cast<int32_t>(std::get<int>(content)));
-      if (content.index() == 1)
+      }
+      if (content.index() == 1) {
         return gandiva::TreeExprBuilder::MakeLiteral(std::get<bool>(content));
-      if (content.index() == 2)
+      }
+      if (content.index() == 2) {
         return gandiva::TreeExprBuilder::MakeLiteral(std::get<float>(content));
-      if (content.index() == 3)
+      }
+      if (content.index() == 3) {
         return gandiva::TreeExprBuilder::MakeLiteral(std::get<double>(content));
-      throw std::runtime_error("Malformed LiteralNode");
+      }
+      if (content.index() == 4) {
+        return gandiva::TreeExprBuilder::MakeLiteral(std::get<uint8_t>(content));
+      }
+      if (content.index() == 5) {
+        return gandiva::TreeExprBuilder::MakeLiteral(std::get<int64_t>(content));
+      }
+      throw runtime_error("Malformed LiteralNode");
     }
 
     if (spec.datum.index() == 3) {
@@ -403,13 +467,13 @@ gandiva::NodePtr createExpressionTree(Operations const& opSpecs,
       }
       auto field = Schema->GetFieldByName(name);
       if (field == nullptr) {
-        throw std::runtime_error(fmt::format("Cannot find field \"{}\"", name));
+        throw runtime_error_f("Cannot find field \"%s\"", name.c_str());
       }
       auto node = gandiva::TreeExprBuilder::MakeField(field);
       fieldNodes.insert({name, node});
       return node;
     }
-    throw std::runtime_error("Malformed DatumSpec");
+    throw runtime_error("Malformed DatumSpec");
   };
 
   gandiva::NodePtr tree = nullptr;
@@ -425,6 +489,16 @@ gandiva::NodePtr createExpressionTree(Operations const& opSpecs,
       return node;
     };
 
+    auto insertEqualizeUpcastNode = [&](gandiva::NodePtr& node1, gandiva::NodePtr& node2, atype::type t1, atype::type t2) {
+      if (t2 > t1) {
+        auto upcast = gandiva::TreeExprBuilder::MakeFunction(upcastTo(t2), {node1}, concreteArrowType(t2));
+        node1 = upcast;
+      } else if (t1 > t2) {
+        auto upcast = gandiva::TreeExprBuilder::MakeFunction(upcastTo(t1), {node2}, concreteArrowType(t1));
+        node2 = upcast;
+      }
+    };
+
     switch (it->op) {
       case BasicOp::LogicalOr:
         tree = gandiva::TreeExprBuilder::MakeOr({leftNode, rightNode});
@@ -433,10 +507,12 @@ gandiva::NodePtr createExpressionTree(Operations const& opSpecs,
         tree = gandiva::TreeExprBuilder::MakeAnd({leftNode, rightNode});
         break;
       default:
-        if (it->op < BasicOp::Exp) {
+        if (it->op < BasicOp::Sqrt) {
           if (it->type != atype::BOOL) {
             leftNode = insertUpcastNode(leftNode, it->left.type);
             rightNode = insertUpcastNode(rightNode, it->right.type);
+          } else if (it->op == BasicOp::Equal || it->op == BasicOp::NotEqual) {
+            insertEqualizeUpcastNode(leftNode, rightNode, it->left.type, it->right.type);
           }
           tree = gandiva::TreeExprBuilder::MakeFunction(binaryOperationsMap[it->op], {leftNode, rightNode}, concreteArrowType(it->type));
         } else {
@@ -455,10 +531,12 @@ bool isSchemaCompatible(gandiva::SchemaPtr const& Schema, Operations const& opSp
 {
   std::set<std::string> opFieldNames;
   for (auto& spec : opSpecs) {
-    if (spec.left.datum.index() == 3)
+    if (spec.left.datum.index() == 3) {
       opFieldNames.insert(std::get<std::string>(spec.left.datum));
-    if (spec.right.datum.index() == 3)
+    }
+    if (spec.right.datum.index() == 3) {
       opFieldNames.insert(std::get<std::string>(spec.right.datum));
+    }
   }
 
   std::set<std::string> schemaFieldNames;
@@ -473,7 +551,7 @@ bool isSchemaCompatible(gandiva::SchemaPtr const& Schema, Operations const& opSp
 void updateExpressionInfos(expressions::Filter const& filter, std::vector<ExpressionInfo>& eInfos)
 {
   if (eInfos.empty()) {
-    throw std::runtime_error("Empty expression info vector.");
+    throw runtime_error("Empty expression info vector.");
   }
   Operations ops = createOperations(filter);
   for (auto& info : eInfos) {

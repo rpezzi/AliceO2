@@ -21,22 +21,18 @@
 #include "Array2D.h"
 #include "PackedCharge.h"
 
-namespace GPUCA_NAMESPACE
-{
-namespace gpu
+namespace GPUCA_NAMESPACE::gpu
 {
 
 class GPUTPCCFDeconvolution : public GPUKernelTemplate
 {
-
  public:
-  struct GPUSharedMemory : public GPUKernelTemplate::GPUSharedMemoryScan64<short, GPUCA_GET_THREAD_COUNT(GPUCA_LB_CLUSTER_FINDER)> {
+  static constexpr size_t SCRATCH_PAD_WORK_GROUP_SIZE = GPUCA_GET_THREAD_COUNT(GPUCA_LB_GPUTPCCFDeconvolution);
+  struct GPUSharedMemory : public GPUKernelTemplate::GPUSharedMemoryScan64<short, GPUCA_GET_THREAD_COUNT(GPUCA_LB_GPUTPCCFDeconvolution)> {
     ChargePos posBcast1[SCRATCH_PAD_WORK_GROUP_SIZE];
     uchar aboveThresholdBcast[SCRATCH_PAD_WORK_GROUP_SIZE];
     uchar buf[SCRATCH_PAD_WORK_GROUP_SIZE * SCRATCH_PAD_COUNT_N];
   };
-
-  static GPUd() void countPeaksImpl(int, int, int, int, GPUSharedMemory&, const Array2D<uchar>&, Array2D<PackedCharge>&, const ChargePos*, const uint);
 
 #ifdef HAVE_O2HEADERS
   typedef GPUTPCClusterFinder processorType;
@@ -55,11 +51,12 @@ class GPUTPCCFDeconvolution : public GPUKernelTemplate
   GPUd() static void Thread(int nBlocks, int nThreads, int iBlock, int iThread, GPUSharedMemory& smem, processorType& clusterer, Args... args);
 
  private:
-  static GPUd() char countPeaksScratchpadInner(ushort, const uchar*, uchar*);
-  static GPUd() char countPeaksScratchpadOuter(ushort, uchar, const uchar*);
+  static GPUd() void deconvolutionImpl(int, int, int, int, GPUSharedMemory&, const Array2D<uchar>&, Array2D<PackedCharge>&, const ChargePos*, const uint);
+
+  static GPUdi() char countPeaksInner(ushort, const uchar*, uchar*);
+  static GPUdi() char countPeaksOuter(ushort, uchar, const uchar*);
 };
 
-} // namespace gpu
-} // namespace GPUCA_NAMESPACE
+} // namespace GPUCA_NAMESPACE::gpu
 
 #endif

@@ -7,12 +7,11 @@
 // In applying this license CERN does not waive the privileges and immunities
 // granted to it by virtue of its status as an Intergovernmental Organization
 // or submit itself to any jurisdiction.
-#ifndef FRAMEWORK_DEVICEINFO_H
-#define FRAMEWORK_DEVICEINFO_H
+#ifndef O2_FRAMEWORK_DEVICEINFO_H_
+#define O2_FRAMEWORK_DEVICEINFO_H_
 
 #include "Framework/LogParsingHelpers.h"
 #include "Framework/Metric2DViewIndex.h"
-#include "Framework/Variant.h"
 #include "Framework/DeviceState.h"
 
 #include <cstddef>
@@ -23,9 +22,7 @@
 #include <array>
 #include <boost/property_tree/ptree.hpp>
 
-namespace o2
-{
-namespace framework
+namespace o2::framework
 {
 
 struct DeviceInfo {
@@ -48,6 +45,7 @@ struct DeviceInfo {
   /// A circular buffer for the severity of each of the entries
   /// in the circular buffer associated to the device.
   std::vector<LogParsingHelpers::LogLevel> historyLevel;
+  std::string firstSevereError;
   std::string lastError;
   /// An unterminated string which is not ready to be printed yet
   std::string unprinted;
@@ -67,8 +65,9 @@ struct DeviceInfo {
   boost::property_tree::ptree currentConfig;
   /// Current provenance for the configuration keys
   boost::property_tree::ptree currentProvenance;
+  /// Port to use to connect to tracy profiler
+  short tracyPort;
 };
 
-} // namespace framework
-} // namespace o2
-#endif // FRAMEWORK_DEVICEINFO_H
+} // namespace o2::framework
+#endif // O2_FRAMEWORK_DEVICEINFO_H_

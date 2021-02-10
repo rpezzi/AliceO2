@@ -14,6 +14,7 @@
 #include "Generators/Generator.h"
 #include "Generators/InteractionDiamondParam.h"
 #include "SimulationDataFormat/MCEventHeader.h"
+#include "SimulationDataFormat/Stack.h"
 #include "FairLogger.h"
 
 #include "FairGenericStack.h"
@@ -40,8 +41,9 @@ PrimaryGenerator::~PrimaryGenerator()
     mEmbedFile->Close();
     delete mEmbedFile;
   }
-  if (mEmbedEvent)
+  if (mEmbedEvent) {
     delete mEmbedEvent;
+  }
 }
 
 /*****************************************************************/
@@ -76,8 +78,9 @@ Bool_t PrimaryGenerator::GenerateEvent(FairGenericStack* pStack)
   /** generate event **/
 
   /** normal generation if no embedding **/
-  if (!mEmbedTree)
+  if (!mEmbedTree) {
     return FairPrimaryGenerator::GenerateEvent(pStack);
+  }
 
   /** this is for embedding **/
 
@@ -89,13 +92,15 @@ Bool_t PrimaryGenerator::GenerateEvent(FairGenericStack* pStack)
   auto genList = GetListOfGenerators();
   for (int igen = 0; igen < genList->GetEntries(); ++igen) {
     auto o2gen = dynamic_cast<Generator*>(genList->At(igen));
-    if (o2gen)
+    if (o2gen) {
       o2gen->notifyEmbedding(mEmbedEvent);
+    }
   }
 
   /** generate event **/
-  if (!FairPrimaryGenerator::GenerateEvent(pStack))
+  if (!FairPrimaryGenerator::GenerateEvent(pStack)) {
     return kFALSE;
+  }
 
   /** add embedding info to event header **/
   auto o2event = dynamic_cast<MCEventHeader*>(fEvent);
@@ -116,7 +121,9 @@ Bool_t PrimaryGenerator::GenerateEvent(FairGenericStack* pStack)
 
 void PrimaryGenerator::AddTrack(Int_t pdgid, Double_t px, Double_t py, Double_t pz,
                                 Double_t vx, Double_t vy, Double_t vz,
-                                Int_t parent, Bool_t wanttracking,
+                                Int_t mother1, Int_t mother2,
+                                Int_t daughter1, Int_t daughter2,
+                                Bool_t wanttracking,
                                 Double_t e, Double_t tof,
                                 Double_t weight, TMCProcess proc)
 {
@@ -146,9 +153,19 @@ void PrimaryGenerator::AddTrack(Int_t pdgid, Double_t px, Double_t py, Double_t 
   Int_t ntr = 0;    // Track number; to be filled by the stack
   Int_t status = 0; // Generation status
 
-  if (parent != -1) {
-    parent += fMCIndexOffset;
-  } // correct for tracks which are in list before generator is called
+  // correct for tracks which are in list before generator is called
+  if (mother1 != -1) {
+    mother1 += fMCIndexOffset;
+  }
+  if (mother2 != -1) {
+    mother2 += fMCIndexOffset;
+  }
+  if (daughter1 != -1) {
+    daughter1 += fMCIndexOffset;
+  }
+  if (daughter2 != -1) {
+    daughter2 += fMCIndexOffset;
+  }
 
   /** if it is a K0/antiK0 to be tracked, convert it into K0s/K0L.
       
@@ -170,9 +187,14 @@ void PrimaryGenerator::AddTrack(Int_t pdgid, Double_t px, Double_t py, Double_t 
   }
 
   /** add track to stack **/
-  fStack->PushTrack(doTracking, parent, pdgid, px, py, pz,
-                    e, vx, vy, vz, tof, polx, poly, polz, proc, ntr,
-                    weight, status, parent);
+  auto stack = dynamic_cast<o2::data::Stack*>(fStack);
+  if (!stack) {
+    LOG(FATAL) << "Stack must be an o2::data:Stack";
+    return; // must be the o2 stack
+  }
+  stack->PushTrack(doTracking, mother1, pdgid, px, py, pz,
+                   e, vx, vy, vz, tof, polx, poly, polz, TMCProcess::kPPrimary, ntr,
+                   weight, status, mother2, daughter1, daughter2, proc);
 
   fNTracks++;
 }

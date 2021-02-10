@@ -11,14 +11,13 @@
 #ifndef ALICEO2_VERTEX_H
 #define ALICEO2_VERTEX_H
 
-#include "MathUtils/Cartesian3D.h"
+#include "GPUCommonDef.h"
+#include "GPUCommonMath.h"
+#include "GPUCommonArray.h"
+#include <MathUtils/Cartesian.h>
+
 #include "CommonDataFormat/TimeStamp.h"
-#ifndef __OPENCL__
-#include <array>
-#endif
-#ifndef ALIGPU_GPUCODE
-#include <iomanip>
-#include <ios>
+#ifndef GPUCA_GPUCODE_DEVICE
 #include <iosfwd>
 #endif
 
@@ -38,50 +37,51 @@ class VertexBase
                         kCovYZ,
                         kCovZZ };
   static constexpr int kNCov = 6;
-  VertexBase() = default;
-  ~VertexBase() = default;
-  VertexBase(const Point3D<float>& pos, const std::array<float, kNCov>& cov) : mPos(pos), mCov(cov)
+  GPUdDefault() VertexBase() = default;
+  GPUdDefault() ~VertexBase() = default;
+  GPUd() VertexBase(const math_utils::Point3D<float>& pos, const gpu::gpustd::array<float, kNCov>& cov) : mPos(pos), mCov(cov)
   {
   }
 
-#ifndef ALIGPU_GPUCODE
+#ifndef GPUCA_GPUCODE_DEVICE
   void print() const;
+  std::string asString() const;
 #endif
 
   // getting the cartesian coordinates and errors
-  float getX() const { return mPos.X(); }
-  float getY() const { return mPos.Y(); }
-  float getZ() const { return mPos.Z(); }
-  float getSigmaX2() const { return mCov[kCovXX]; }
-  float getSigmaY2() const { return mCov[kCovYY]; }
-  float getSigmaZ2() const { return mCov[kCovZZ]; }
-  float getSigmaXY() const { return mCov[kCovXY]; }
-  float getSigmaXZ() const { return mCov[kCovXZ]; }
-  float getSigmaYZ() const { return mCov[kCovYZ]; }
-  const std::array<float, kNCov>& getCov() const { return mCov; }
+  GPUd() float getX() const { return mPos.X(); }
+  GPUd() float getY() const { return mPos.Y(); }
+  GPUd() float getZ() const { return mPos.Z(); }
+  GPUd() float getSigmaX2() const { return mCov[kCovXX]; }
+  GPUd() float getSigmaY2() const { return mCov[kCovYY]; }
+  GPUd() float getSigmaZ2() const { return mCov[kCovZZ]; }
+  GPUd() float getSigmaXY() const { return mCov[kCovXY]; }
+  GPUd() float getSigmaXZ() const { return mCov[kCovXZ]; }
+  GPUd() float getSigmaYZ() const { return mCov[kCovYZ]; }
+  GPUd() const gpu::gpustd::array<float, kNCov>& getCov() const { return mCov; }
 
-  Point3D<float> getXYZ() const { return mPos; }
-  Point3D<float>& getXYZ() { return mPos; }
+  GPUd() math_utils::Point3D<float> getXYZ() const { return mPos; }
+  GPUd() math_utils::Point3D<float>& getXYZ() { return mPos; }
 
-  void setX(float x) { mPos.SetX(x); }
-  void setY(float y) { mPos.SetY(y); }
-  void setZ(float z) { mPos.SetZ(z); }
+  GPUd() void setX(float x) { mPos.SetX(x); }
+  GPUd() void setY(float y) { mPos.SetY(y); }
+  GPUd() void setZ(float z) { mPos.SetZ(z); }
 
-  void setXYZ(float x, float y, float z)
+  GPUd() void setXYZ(float x, float y, float z)
   {
     setX(x);
     setY(y);
     setZ(z);
   }
-  void setPos(const Point3D<float>& p) { mPos = p; }
+  GPUd() void setPos(const math_utils::Point3D<float>& p) { mPos = p; }
 
-  void setSigmaX2(float v) { mCov[kCovXX] = v; }
-  void setSigmaY2(float v) { mCov[kCovYY] = v; }
-  void setSigmaZ2(float v) { mCov[kCovZZ] = v; }
-  void setSigmaXY(float v) { mCov[kCovXY] = v; }
-  void setSigmaXZ(float v) { mCov[kCovXZ] = v; }
-  void setSigmaYZ(float v) { mCov[kCovYZ] = v; }
-  void setCov(float sxx, float sxy, float syy, float sxz, float syz, float szz)
+  GPUd() void setSigmaX2(float v) { mCov[kCovXX] = v; }
+  GPUd() void setSigmaY2(float v) { mCov[kCovYY] = v; }
+  GPUd() void setSigmaZ2(float v) { mCov[kCovZZ] = v; }
+  GPUd() void setSigmaXY(float v) { mCov[kCovXY] = v; }
+  GPUd() void setSigmaXZ(float v) { mCov[kCovXZ] = v; }
+  GPUd() void setSigmaYZ(float v) { mCov[kCovYZ] = v; }
+  GPUd() void setCov(float sxx, float sxy, float syy, float sxz, float syz, float szz)
   {
     setSigmaX2(sxx);
     setSigmaY2(syy);
@@ -90,11 +90,11 @@ class VertexBase
     setSigmaXZ(sxz);
     setSigmaYZ(syz);
   }
-  void setCov(const std::array<float, kNCov>& cov) { mCov = cov; }
+  GPUd() void setCov(const gpu::gpustd::array<float, kNCov>& cov) { mCov = cov; }
 
  protected:
-  Point3D<float> mPos{0., 0., 0.}; ///< cartesian position
-  std::array<float, kNCov> mCov{}; ///< errors, see CovElems enum
+  math_utils::Point3D<float> mPos{0., 0., 0.}; ///< cartesian position
+  gpu::gpustd::array<float, kNCov> mCov{};     ///< errors, see CovElems enum
 
   ClassDefNV(VertexBase, 1);
 };
@@ -103,65 +103,50 @@ class VertexBase
 // The Stamp template parameter allows to define vertex (time)stamp in different
 // formats (ITS ROFrame ID, real time + error etc)
 
-template <typename Stamp = o2::dataformats::TimeStamp<int>>
+template <typename Stamp>
 class Vertex : public VertexBase
 {
  public:
   using ushort = unsigned short;
-  static ushort constexpr FlagsMask = 0xffff;
+  enum Flags : ushort {
+    TimeValidated = 0x1 << 0, // Flag that the vertex was validated by external time measurement (e.g. FIT)
+    FlagsMask = 0xffff
+  };
 
-  Vertex() = default;
-  ~Vertex() = default;
-  Vertex(const Point3D<float>& pos, const std::array<float, kNCov>& cov, ushort nCont, float chi2)
+  GPUdDefault() Vertex() = default;
+  GPUdDefault() ~Vertex() = default;
+  GPUd() Vertex(const math_utils::Point3D<float>& pos, const gpu::gpustd::array<float, kNCov>& cov, ushort nCont, float chi2)
     : VertexBase(pos, cov), mNContributors(nCont), mChi2(chi2)
   {
   }
 
-#ifndef ALIGPU_GPUCODE
-  void print() const;
-#endif
+  GPUd() ushort getNContributors() const { return mNContributors; }
+  GPUd() void setNContributors(ushort v) { mNContributors = v; }
+  GPUd() void addContributor() { mNContributors++; }
 
-  ushort getNContributors() const { return mNContributors; }
-  void setNContributors(ushort v) { mNContributors = v; }
+  GPUd() ushort getFlags() const { return mBits; }
+  GPUd() bool isFlagSet(uint f) const { return mBits & (FlagsMask & f); }
+  GPUd() void setFlags(ushort f) { mBits |= FlagsMask & f; }
+  GPUd() void resetFrags(ushort f = FlagsMask) { mBits &= ~(FlagsMask & f); }
 
-  ushort getBits() const { return mBits; }
-  bool isBitSet(int bit) const { return mBits & (FlagsMask & (0x1 << bit)); }
-  void setBits(ushort b) { mBits = b; }
-  void setBit(int bit) { mBits |= FlagsMask & (0x1 << bit); }
-  void resetBit(int bit) { mBits &= ~(FlagsMask & (0x1 << bit)); }
+  GPUd() void setChi2(float v) { mChi2 = v; }
+  GPUd() float getChi2() const { return mChi2; }
 
-  void setChi2(float v) { mChi2 = v; }
-  float getChi2() const { return mChi2; }
+  GPUd() const Stamp& getTimeStamp() const { return mTimeStamp; }
+  GPUd() Stamp& getTimeStamp() { return mTimeStamp; }
+  GPUd() void setTimeStamp(const Stamp& v) { mTimeStamp = v; }
 
-  const Stamp& getTimeStamp() const { return mTimeStamp; }
-  Stamp& getTimeStamp() { return mTimeStamp; }
-  void setTimeStamp(const Stamp& v) { mTimeStamp = v; }
+ protected:
+  float mChi2 = 0;           ///< chi2 or quality of tracks to vertex attachment
+  ushort mNContributors = 0; ///< N contributors
+  ushort mBits = 0;          ///< bit field for flags
+  Stamp mTimeStamp;          ///< vertex time-stamp
 
- private:
-  float mChi2 = 0;               ///< chi2 or quality of tracks to vertex attachment
-  ushort mNContributors = 0;     ///< N contributors
-  ushort mBits = 0;              ///< bit field for flags
-  Stamp mTimeStamp;              ///< vertex time-stamp
-
-  ClassDefNV(Vertex, 2);
+  ClassDefNV(Vertex, 3);
 };
 
-#ifndef ALIGPU_GPUCODE
+#ifndef GPUCA_GPUCODE_DEVICE
 std::ostream& operator<<(std::ostream& os, const o2::dataformats::VertexBase& v);
-
-template <typename Stamp>
-inline std::ostream& operator<<(std::ostream& os, const o2::dataformats::Vertex<Stamp>& v)
-{
-  // stream itself
-  os << (const VertexBase&)v << "\n NCont: " << v.getNContributors() << " Chi2: " << v.getChi2() << " TimeStamp: " << v.getTimeStamp();
-  return os;
-}
-
-template <typename Stamp>
-void Vertex<Stamp>::print() const
-{
-  std::cout << *this << std::endl;
-}
 #endif
 
 } // namespace dataformats

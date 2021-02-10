@@ -21,8 +21,9 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include <array>
-#include "TRDBase/TRDGeometry.h"
-#include "TRDBase/TRDSimParam.h"
+#include "TRDBase/Geometry.h"
+#include "TRDBase/SimParam.h"
+#include "DataFormatsTRD/Constants.h"
 class TH2D;
 
 namespace o2
@@ -49,9 +50,9 @@ class ChamberStatus
   ChamberStatus() = default;
   ~ChamberStatus() = default;
   //
-  //  char getStatus(int p, int c, int s) const { int roc=TRDGeometry::getDetector(p,c,s); return mStatus[roc];}
+  //  char getStatus(int p, int c, int s) const { int roc=Geometry::getDetector(p,c,s); return mStatus[roc];}
   char getStatus(int det) const { return mStatus[det]; }
-  //  void setStatus(int p, int c, int s, char status) { int roc=TRDGeometry::getDetector(p,c,s); setStatus(roc,status);}
+  //  void setStatus(int p, int c, int s, char status) { int roc=Geometry::getDetector(p,c,s); setStatus(roc,status);}
   void setStatus(int det, char status);
   void setRawStatus(int det, char status) { mStatus[det] = status; };
   void unsetStatusBit(int det, char status);
@@ -67,7 +68,7 @@ class ChamberStatus
   TH2D* plotBadCalibrated(int sm, int rphi); // Plot calibration status for sm and halfchamberside
   TH2D* plot(int sm);                        // Plot mStatus for sm
  protected:
-  std::array<char, TRDSimParam::kNdet> mStatus{};
+  std::array<char, constants::MAXCHAMBER> mStatus{};
 };
 } // namespace trd
 } // namespace o2

@@ -23,6 +23,7 @@ void MC2RawEncoder<Mapping>::init()
 {
   assert(mWriter.isReadOutModeSet());
   mWriter.setCarryOverCallBack(this);
+  mWriter.setNewRDHCallBack(this);
 
   // limit RUs to convert to existing ones
   mRUSWMax = (mRUSWMax < uint8_t(mMAP.getNRUs())) ? mRUSWMax : mMAP.getNRUs() - 1;
@@ -34,7 +35,7 @@ void MC2RawEncoder<Mapping>::init()
     for (int il = 0; il < RUDecodeData::MaxLinksPerRU; il++) {
       auto* link = getGBTLink(ruData.links[il]);
       if (link) {
-        auto subspec = o2::raw::RDHUtils::getSubSpec(link->cruID, link->idInCRU, link->endPointID, link->feeID);
+        auto subspec = RDHUtils::getSubSpec(link->cruID, link->idInCRU, link->endPointID, link->feeID);
         if (!mWriter.isLinkRegistered(subspec)) {
           LOGF(INFO, "RU%3d FEEId 0x%04x Link %02d of CRU=0x%94x will be writing to default sink %s",
                int(ru), link->feeID, link->idInCRU, link->cruID, mDefaultSinkName);
@@ -64,8 +65,13 @@ void MC2RawEncoder<Mapping>::init()
       mNLinks++;
     }
   }
-
   assert(mNLinks > 0);
+  // create mapping from feeID to links for fast access
+  for (int i = 0; i < mNLinks; i++) {
+    const auto* lnk = getGBTLink(i);
+    mFEEId2Link[lnk->feeID] = lnk;
+    mFEEId2GBTHeader[lnk->feeID].activeLanes = lnk->lanes;
+  }
 }
 
 ///______________________________________________________________________
@@ -174,27 +180,23 @@ void MC2RawEncoder<Mapping>::fillGBTLinks(RUDecodeData& ru)
     // estimate real payload size in GBT words
     int nPayLoadWordsNeeded = 0;           // number of payload words filled to link buffer (RDH not included) for current IR
     for (int icab = ru.nCables; icab--;) { // calculate number of GBT words per link
-      if ((link->lanes & (0x1 << icab))) {
-        int nb = ru.cableData[icab].getSize();
+      if ((link->lanes & (0x1 << mMAP.cablePos(ru.ruInfo->ruType, icab)))) {
+        int nb = ru.cableData[mMAP.cablePos(ru.ruInfo->ruType, icab)].getSize();
         nPayLoadWordsNeeded += nb ? 1 + (nb - 1) / 9 : 0; // single GBT word carries at most 9 payload bytes
       }
     }
     // reserve space for payload + trigger + header + trailer
     link->data.ensureFreeCapacity((3 + nPayLoadWordsNeeded) * GBTPaddedWordLength);
-    link->data.addFast(gbtTrigger.getW8(), GBTPaddedWordLength); // write GBT trigger in the beginning of the buffer
 
-    GBTDataHeader gbtHeader;
-    gbtHeader.packetIdx = 0;
-    gbtHeader.activeLanes = link->lanes;
-    link->data.addFast(gbtHeader.getW8(), GBTPaddedWordLength); // write GBT header
+    link->data.addFast(gbtTrigger.getW8(), GBTPaddedWordLength); // write GBT trigger
 
     // now loop over the lanes served by this link, writing each time at most 9 bytes, untill all lanes are copied
     bool hasData = true;
     while (hasData) {
       hasData = false;
       for (int icab = 0; icab < ru.nCables; icab++) {
-        if ((link->lanes & (0x1 << icab))) {
-          auto& cableData = ru.cableData[icab];
+        if ((link->lanes & (0x1 << mMAP.cablePos(ru.ruInfo->ruType, icab)))) {
+          auto& cableData = ru.cableData[mMAP.cablePos(ru.ruInfo->ruType, icab)];
           int nb = cableData.getUnusedSize();
           if (!nb) {
             continue; // write 80b word only if there is something to write
@@ -202,10 +204,10 @@ void MC2RawEncoder<Mapping>::fillGBTLinks(RUDecodeData& ru)
           if (nb > 9) {
             nb = 9;
           }
-          int gbtWordStart = link->data.getSize();                                                       // beginning of the current GBT word in the link
-          link->data.addFast(cableData.getPtr(), nb);                                                    // fill payload of cable
-          link->data.addFast(zero16, GBTPaddedWordLength - nb);                                          // fill the rest of the GBT word by 0
-          link->data[gbtWordStart + 9] = mMAP.getGBTHeaderRUType(ru.ruInfo->ruType, ru.cableHWID[icab]); // set cable flag
+          int gbtWordStart = link->data.getSize();                                                                                         // beginning of the current GBT word in the link
+          link->data.addFast(cableData.getPtr(), nb);                                                                                      // fill payload of cable
+          link->data.addFast(zero16, GBTPaddedWordLength - nb);                                                                            // fill the rest of the GBT word by 0
+          link->data[gbtWordStart + 9] = mMAP.getGBTHeaderRUType(ru.ruInfo->ruType, ru.cableHWID[mMAP.cablePos(ru.ruInfo->ruType, icab)]); // set cable flag
           cableData.setPtr(cableData.getPtr() + nb);
           hasData = true;
         } // storing data of single cable
@@ -214,8 +216,8 @@ void MC2RawEncoder<Mapping>::fillGBTLinks(RUDecodeData& ru)
 
     // all payload was dumped, write final trailer
     GBTDataTrailer gbtTrailer; // lanes will be set on closing the trigger
-    gbtTrailer.lanesStops = link->lanes;
-    gbtTrailer.packetDone = true;
+    //    gbtTrailer.lanesStops = link->lanes; // RS CURRENTLY NOT USED
+    gbtTrailer.packetDone = true;                                // RS CURRENTLY NOT USED
     link->data.addFast(gbtTrailer.getW8(), GBTPaddedWordLength); // write GBT trailer for the last packet
     LOGF(DEBUG, "Filled %s with %d GBT words", link->describe(), nPayLoadWordsNeeded + 3);
 
@@ -280,38 +282,60 @@ int MC2RawEncoder<Mapping>::carryOverMethod(const header::RDHAny* rdh, const gsl
   // In case returned actualSize == 0, current CRU page will be closed w/o adding anything, and new
   // query of this method will be done on the new CRU page
 
-  constexpr int TrigHeadSize = sizeof(GBTTrigger) + sizeof(GBTDataHeader);
-  constexpr int TotServiceSize = sizeof(GBTTrigger) + sizeof(GBTDataHeader) + sizeof(GBTDataTrailer);
+  // During the carry-over ITS needs to repeat the GBTTrigger and GBTDataTrailer words.
+  // Also the GBTDataHeader needs to be repeated right after continuation RDH, but it will be provided in the newRDHMethod
+  constexpr int TrigHeadSize = sizeof(GBTTrigger);
+  constexpr int TotServiceSize = sizeof(GBTTrigger) + sizeof(GBTDataTrailer);
 
   int offs = ptr - &data[0]; // offset wrt the head of the payload
   // make sure ptr and end of the suggested block are within the payload
   assert(offs >= 0 && size_t(offs + maxSize) <= data.size());
 
-  if ((maxSize <= TotServiceSize)) {  // we cannot split trigger+header
-    return 0;                         // suggest moving the whole payload to the new CRU page
-  }
-
   // this is where we would usually split: account for the trailer to add
   int actualSize = maxSize - sizeof(GBTDataTrailer);
-
   char* trailPtr = &data[data.size() - sizeof(GBTDataTrailer)]; // pointer on the payload trailer
-  if (ptr + actualSize >= trailPtr) {                           // we need to split at least 1 GBT word before the trailer
-    actualSize = trailPtr - ptr - GBTPaddedWordLength;
+
+  if ((maxSize <= TotServiceSize)) { // we cannot split trigger+header
+    actualSize = 0;                  // suggest moving the whole payload to the new CRU page
+    if (offs == 0) {                 // just carry over everything, trigger+header was not yet written
+      return actualSize;
+    }
+  } else {
+    if (ptr + actualSize >= trailPtr) { // we need to split at least 1 GBT word before the trailer
+      actualSize = trailPtr - ptr - GBTPaddedWordLength;
+    }
   }
   // copy the GBTTrigger and GBTHeader from the head of the payload
   header.resize(TrigHeadSize);
   memcpy(header.data(), &data[0], TrigHeadSize);
-  GBTDataHeader& gbtHeader = *reinterpret_cast<GBTDataHeader*>(&header[sizeof(GBTTrigger)]); // 1st trigger then header are written
-  gbtHeader.packetIdx = splitID + 1;                                                         // update the ITS specific packets counter
 
   // copy the GBTTrailer from the end of the payload
   trailer.resize(sizeof(GBTDataTrailer));
   memcpy(trailer.data(), trailPtr, sizeof(GBTDataTrailer));
   GBTDataTrailer& gbtTrailer = *reinterpret_cast<GBTDataTrailer*>(&trailer[0]);
   gbtTrailer.packetDone = false; // intermediate trailers should not have done=true
-  gbtTrailer.lanesStops = 0;     // intermediate trailers should not have lanes closed
+  //  gbtTrailer.lanesStops = 0;     // intermediate trailers should not have lanes closed // RS CURRENTLY NOT USED
 
   return actualSize;
+}
+
+///______________________________________________________________________
+template <class Mapping>
+void MC2RawEncoder<Mapping>::newRDHMethod(const header::RDHAny* rdh, bool empty, std::vector<char>& toAdd) const
+{
+  // these method is called by the writer when it opens a new RDH page to fill some data.
+  // empty tells if the previous RDH page had some payload (to differentiate between automatic open/close of empty RDH pages, handled by
+  // the emptyHBFFunc and read data filling
+  if (RDHUtils::getStop(rdh)) { // the RDH was added to close previous HBF, do we want to add diagnostic data?
+    if (!empty) {
+      GBTDiagnostic diag;
+      toAdd.resize(GBTPaddedWordLength);
+      memcpy(toAdd.data(), diag.getW8(), GBTPaddedWordLength);
+    }
+  } else { // we need to add GBTDataHeader
+    toAdd.resize(GBTPaddedWordLength);
+    memcpy(toAdd.data(), mFEEId2GBTHeader.find(RDHUtils::getFEEID(rdh))->second.getW8(), GBTPaddedWordLength);
+  }
 }
 
 template class o2::itsmft::MC2RawEncoder<o2::itsmft::ChipMappingITS>;

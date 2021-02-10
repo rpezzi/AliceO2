@@ -10,6 +10,7 @@
 
 #include "TOFSimulation/Digitizer.h"
 #include "DetectorsBase/GeometryManager.h"
+#include "TOFSimulation/TOFSimParams.h"
 
 #include "TCanvas.h"
 #include "TFile.h"
@@ -88,9 +89,9 @@ int Digitizer::process(const std::vector<HitType>* hits, std::vector<Digit>* dig
   // hits array of TOF hits for a given simulated event
   // digits passed from external to be filled, in continuous readout mode we will push it on mDigitsPerTimeFrame vector of vectors of digits
 
-  //  printf("process event time = %f with %ld hits\n",mEventTime,hits->size());
+  //  printf("process event time = %f with %ld hits\n",mEventTime.getTimeNS(),hits->size());
 
-  Int_t readoutwindow = Int_t((mEventTime - Geo::BC_TIME * (Geo::OVERLAP_IN_BC + 2)) * Geo::READOUTWINDOW_INV); // event time shifted by 2 BC as safe margin before to change current readout window to account for decalibration
+  Int_t readoutwindow = Int_t((mEventTime.getTimeNS() - Geo::BC_TIME * (Geo::OVERLAP_IN_BC + 2)) * Geo::READOUTWINDOW_INV); // event time shifted by 2 BC as safe margin before to change current readout window to account for decalibration
 
   if (mContinuous && readoutwindow > mReadoutWindowCurrent) { // if we are moving in future readout windows flush previous ones (only for continuous readout mode)
     digits->clear();
@@ -104,7 +105,7 @@ int Digitizer::process(const std::vector<HitType>* hits, std::vector<Digit>* dig
   for (auto& hit : *hits) {
     //TODO: put readout window counting/selection
 
-    processHit(hit, mEventTime);
+    processHit(hit, mEventTime.getTimeOffsetWrtBC());
   } // end loop over hits
 
   if (!mContinuous) { // fill output container per event
@@ -130,8 +131,9 @@ Int_t Digitizer::processHit(const HitType& hit, Double_t event_time)
   detIndOtherPad[2] = detInd[2]; // same sector, plate, strip
 
   Int_t otherraw = 0;
-  if (detInd[3] == 0)
+  if (detInd[3] == 0) {
     otherraw = 1;
+  }
 
   Int_t iZshift = otherraw ? 1 : -1;
 
@@ -167,10 +169,11 @@ Int_t Digitizer::processHit(const HitType& hit, Double_t event_time)
   detIndOtherPad[4] = detInd[4];
   channel = Geo::getIndex(detIndOtherPad);
   xLocal = deltapos[0]; // recompute local coordinates
-  if (otherraw)
+  if (otherraw) {
     zLocal = deltapos[2] - Geo::ZPAD; // recompute local coordinates
-  else
+  } else {
     zLocal = deltapos[2] + Geo::ZPAD;
+  }
   if (isFired(xLocal, zLocal, charge)) {
     ndigits++;
     addDigit(channel, istrip, time, xLocal, zLocal, charge, 0, iZshift, detInd[3], trackID);
@@ -208,10 +211,11 @@ Int_t Digitizer::processHit(const HitType& hit, Double_t event_time)
   if (detIndOtherPad[4] >= 0) {
     channel = Geo::getIndex(detIndOtherPad);
     xLocal = deltapos[0] + Geo::XPAD; // recompute local coordinates
-    if (otherraw)
+    if (otherraw) {
       zLocal = deltapos[2] - Geo::ZPAD; // recompute local coordinates
-    else
+    } else {
       zLocal = deltapos[2] + Geo::ZPAD;
+    }
     if (isFired(xLocal, zLocal, charge)) {
       ndigits++;
       addDigit(channel, istrip, time, xLocal, zLocal, charge, -1, iZshift, detInd[3], trackID);
@@ -224,10 +228,11 @@ Int_t Digitizer::processHit(const HitType& hit, Double_t event_time)
   if (detIndOtherPad[4] < Geo::NPADX) {
     channel = Geo::getIndex(detIndOtherPad);
     xLocal = deltapos[0] - Geo::XPAD; // recompute local coordinates
-    if (otherraw)
+    if (otherraw) {
       zLocal = deltapos[2] - Geo::ZPAD; // recompute local coordinates
-    else
+    } else {
       zLocal = deltapos[2] + Geo::ZPAD;
+    }
     if (isFired(xLocal, zLocal, charge)) {
       ndigits++;
       addDigit(channel, istrip, time, xLocal, zLocal, charge, 1, iZshift, detInd[3], trackID);
@@ -245,7 +250,12 @@ void Digitizer::addDigit(Int_t channel, UInt_t istrip, Double_t time, Float_t x,
   time = getDigitTimeSmeared(time, x, z, charge); // add time smearing
 
   charge *= getFractionOfCharge(x, z);
-  Float_t tot = 12; // time-over-threshold
+
+  // tot tuned to reproduce 0.8% of orphans tot(=0)
+  Float_t tot = gRandom->Gaus(12., 1.5); // time-over-threshold
+  if (tot < 8.4) {
+    tot = 0;
+  }
 
   Float_t xborder = Geo::XPAD * 0.5 - TMath::Abs(x);
   Float_t zborder = Geo::ZPAD * 0.5 - TMath::Abs(z);
@@ -263,27 +273,26 @@ void Digitizer::addDigit(Int_t channel, UInt_t istrip, Double_t time, Float_t x,
     // if(border > 0)  printf("deltat =%f\n",mTimeDelay*border*border*border);
     // else printf("deltat=0\n");
     // getchar();
-    if (border > 0)
+    if (border > 0) {
       time += mTimeDelay * border * border * border;
+    }
   }
   time += TMath::Sqrt(timewalkX * timewalkX + timewalkZ * timewalkZ) - mTimeDelayCorr - mTimeWalkeSlope * 2;
 
   // Decalibrate
   time -= mCalibApi->getTimeDecalibration(channel, tot); //TODO:  to be checked that "-" is correct, and we did not need "+" instead :-)
 
-  Int_t nbc = Int_t(time * Geo::BC_TIME_INPS_INV); // time elapsed in number of bunch crossing
+  // let's move from time to bc, tdc
+
+  uint64_t nbc = (uint64_t)(time * Geo::BC_TIME_INPS_INV); // time elapsed in number of bunch crossing
   //Digit newdigit(time, channel, (time - Geo::BC_TIME_INPS * nbc) * Geo::NTDCBIN_PER_PS, tot * Geo::NTOTBIN_PER_NS, nbc);
 
   int tdc = int((time - Geo::BC_TIME_INPS * nbc) * Geo::NTDCBIN_PER_PS);
 
-  // additional check to avoid very rare truncation
-  if (tdc < 0) {
-    nbc--;
-    tdc += 1024;
-  } else if (tdc >= 1024) {
-    nbc++;
-    tdc -= 1024;
-  }
+  // add orbit and bc
+  nbc += mEventTime.toLong();
+
+  //  printf("orbit = %d -- bc = %d -- nbc = (%d) %d\n",mEventTime.orbit,mEventTime.bc, mEventTime.toLong(),nbc);
 
   //  printf("tdc = %d\n",tdc);
 
@@ -295,13 +304,11 @@ void Digitizer::addDigit(Int_t channel, UInt_t istrip, Double_t time, Float_t x,
 
   if (mContinuous) {
     isnext = nbc / Geo::BC_IN_WINDOW - mReadoutWindowCurrent;
-    //    isnext = Int_t(time * 1E-3 * Geo::READOUTWINDOW_INV) - mReadoutWindowCurrent; // to be replaced with uncalibrated time
     isIfOverlap = (nbc - Geo::OVERLAP_IN_BC) / Geo::BC_IN_WINDOW - mReadoutWindowCurrent;
-    //    isIfOverlap = Int_t((time - Geo::BC_TIME_INPS * Geo::OVERLAP_IN_BC) * 1E-3 * Geo::READOUTWINDOW_INV) - mReadoutWindowCurrent; // to be replaced with uncalibrated time;
 
-    if (isnext == isIfOverlap)
+    if (isnext == isIfOverlap) {
       isIfOverlap = -1;
-    else if (isnext < 0 && isIfOverlap >= 0) {
+    } else if (isnext < 0 && isIfOverlap >= 0) {
       isnext = isIfOverlap;
       isIfOverlap = -1;
     } else if (isnext >= MAXWINDOWS && isIfOverlap < MAXWINDOWS) {
@@ -311,7 +318,7 @@ void Digitizer::addDigit(Int_t channel, UInt_t istrip, Double_t time, Float_t x,
 
     if (isnext < 0) {
       LOG(ERROR) << "error: isnext =" << isnext << "(current window = " << mReadoutWindowCurrent << ")"
-                 << " nbc = " << nbc << " -- event time = " << mEventTime << "\n";
+                 << " nbc = " << nbc << " -- event time = " << mEventTime.getTimeNS() << "\n";
 
       return;
     }
@@ -336,8 +343,9 @@ void Digitizer::addDigit(Int_t channel, UInt_t istrip, Double_t time, Float_t x,
       insertDigitInFuture(channel, tdc, tot * Geo::NTOTBIN_PER_NS, nbc, lblCurrent);
     }
 
-    if (isnext)
+    if (isnext) {
       iscurrent = false;
+    }
   }
 
   //printf("add TOF digit c=%i n=%i\n",iscurrent,isnext);
@@ -353,12 +361,7 @@ void Digitizer::addDigit(Int_t channel, UInt_t istrip, Double_t time, Float_t x,
     mcTruthContainer = mMCTruthContainerNext[isnext - 1];
   }
 
-  int eventcounter = mReadoutWindowCurrent + isnext;
-  int hittimeTDC = (nbc - eventcounter * Geo::BC_IN_WINDOW) * 1024 + tdc; // time in TDC bin within the TOF WINDOW
-  if (hittimeTDC < 0)
-    LOG(ERROR) << "1) Negative hit " << hittimeTDC << ", something went wrong in filling readout window: isnext=" << isnext << ", isIfOverlap=" << isIfOverlap;
-  else
-    fillDigitsInStrip(strips, mcTruthContainer, channel, tdc, tot, nbc, istrip, trackID, mEventID, mSrcID);
+  fillDigitsInStrip(strips, mcTruthContainer, channel, tdc, tot, nbc, istrip, trackID, mEventID, mSrcID);
 
   if (isIfOverlap > -1 && isIfOverlap < MAXWINDOWS) { // fill also a second readout window because of the overlap
     if (!isIfOverlap) {
@@ -369,16 +372,11 @@ void Digitizer::addDigit(Int_t channel, UInt_t istrip, Double_t time, Float_t x,
       mcTruthContainer = mMCTruthContainerNext[isIfOverlap - 1];
     }
 
-    int eventcounter = mReadoutWindowCurrent + isIfOverlap;
-    int hittimeTDC = (nbc - eventcounter * Geo::BC_IN_WINDOW) * 1024 + tdc; // time in TDC bin within the TOF WINDOW
-    if (hittimeTDC < 0)
-      LOG(ERROR) << "2) Negative hit " << hittimeTDC << ", something went wrong in filling readout window: isnext=" << isnext << ", isIfOverlap=" << isIfOverlap;
-    else
-      fillDigitsInStrip(strips, mcTruthContainer, channel, tdc, tot, nbc, istrip, trackID, mEventID, mSrcID);
+    fillDigitsInStrip(strips, mcTruthContainer, channel, tdc, tot, nbc, istrip, trackID, mEventID, mSrcID);
   }
 }
 //______________________________________________________________________
-void Digitizer::fillDigitsInStrip(std::vector<Strip>* strips, o2::dataformats::MCTruthContainer<o2::tof::MCLabel>* mcTruthContainer, int channel, int tdc, int tot, int nbc, UInt_t istrip, Int_t trackID, Int_t eventID, Int_t sourceID)
+void Digitizer::fillDigitsInStrip(std::vector<Strip>* strips, o2::dataformats::MCTruthContainer<o2::tof::MCLabel>* mcTruthContainer, int channel, int tdc, int tot, uint64_t nbc, UInt_t istrip, Int_t trackID, Int_t eventID, Int_t sourceID)
 {
   int lblCurrent;
   if (mcTruthContainer) {
@@ -430,18 +428,21 @@ Float_t Digitizer::getCharge(Float_t eDep)
 //______________________________________________________________________
 Bool_t Digitizer::isFired(Float_t x, Float_t z, Float_t charge)
 {
-  if (TMath::Abs(x) > Geo::XPAD * 0.5 + 0.3)
+  if (TMath::Abs(x) > Geo::XPAD * 0.5 + 0.3) {
     return kFALSE;
-  if (TMath::Abs(z) > Geo::ZPAD * 0.5 + 0.3)
+  }
+  if (TMath::Abs(z) > Geo::ZPAD * 0.5 + 0.3) {
     return kFALSE;
+  }
 
   Float_t effX = getEffX(x);
   Float_t effZ = getEffZ(z);
 
   Float_t efficiency = TMath::Min(effX, effZ);
 
-  if (gRandom->Rndm() > efficiency)
+  if (gRandom->Rndm() > efficiency) {
     return kFALSE;
+  }
 
   return kTRUE;
 }
@@ -452,20 +453,22 @@ Float_t Digitizer::getEffX(Float_t x)
   Float_t xborder = Geo::XPAD * 0.5 - TMath::Abs(x);
 
   if (xborder > 0) {
-    if (xborder > mBound1)
+    if (xborder > mBound1) {
       return mEffCenter;
-    else if (xborder > mBound2)
+    } else if (xborder > mBound2) {
       return mEffBoundary1 + (mEffCenter - mEffBoundary1) * (xborder - mBound2) / (mBound1 - mBound2);
-    else
+    } else {
       return mEffBoundary2 + (mEffBoundary1 - mEffBoundary2) * xborder / mBound2;
+    }
   } else {
     xborder *= -1;
-    if (xborder > mBound4)
+    if (xborder > mBound4) {
       return 0;
-    else if (xborder > mBound3)
+    } else if (xborder > mBound3) {
       return mEffBoundary3 - mEffBoundary3 * (xborder - mBound3) / (mBound4 - mBound3);
-    else
+    } else {
       return mEffBoundary2 + (mEffBoundary3 - mEffBoundary2) * xborder / mBound3;
+    }
   }
 
   return 0;
@@ -477,20 +480,22 @@ Float_t Digitizer::getEffZ(Float_t z)
   Float_t zborder = Geo::ZPAD * 0.5 - TMath::Abs(z);
 
   if (zborder > 0) {
-    if (zborder > mBound1)
+    if (zborder > mBound1) {
       return mEffCenter;
-    else if (zborder > mBound2)
+    } else if (zborder > mBound2) {
       return mEffBoundary1 + (mEffCenter - mEffBoundary1) * (zborder - mBound2) / (mBound1 - mBound2);
-    else
+    } else {
       return mEffBoundary2 + (mEffBoundary1 - mEffBoundary2) * zborder / mBound2;
+    }
   } else {
     zborder *= -1;
-    if (zborder > mBound4)
+    if (zborder > mBound4) {
       return 0;
-    else if (zborder > mBound3)
+    } else if (zborder > mBound3) {
       return mEffBoundary3 - mEffBoundary3 * (zborder - mBound3) / (mBound4 - mBound3);
-    else
+    } else {
       return mEffBoundary2 + (mEffBoundary3 - mEffBoundary2) * zborder / mBound3;
+    }
   }
 
   return 0;
@@ -508,12 +513,12 @@ void Digitizer::initParameters()
   mBound4 = 0.9;  // distance from border (not fired pad) when efficiency vanishes
 
   // resolution parameters
-  mTOFresolution = 60;    // TOF global resolution in ps
+  mTOFresolution = TOFSimParams::Instance().time_resolution; // TOF global resolution in ps
   mShowerResolution = 50; // smearing correlated for all digits of the same hit
-  if (mTOFresolution > mShowerResolution)
+  if (mTOFresolution > mShowerResolution) {
     mDigitResolution = TMath::Sqrt(mTOFresolution * mTOFresolution -
                                    mShowerResolution * mShowerResolution); // independent smearing for each digit
-  else {
+  } else {
     mShowerResolution = mTOFresolution;
     mDigitResolution = 0;
   }
@@ -529,21 +534,23 @@ void Digitizer::initParameters()
   }
 
   mTimeDelayCorr = mTimeDelay / 3.5;
-  if (mShowerResolution > mTimeDelayCorr)
+  if (mShowerResolution > mTimeDelayCorr) {
     mShowerResolution = TMath::Sqrt(mShowerResolution * mShowerResolution - mTimeDelayCorr * mTimeDelayCorr);
-  else
+  } else {
     mShowerResolution = 0;
+  }
 
-  if (mShowerResolution > mTimeWalkeSlope * 0.8)
+  if (mShowerResolution > mTimeWalkeSlope * 0.8) {
     mShowerResolution = TMath::Sqrt(mShowerResolution * mShowerResolution - mTimeWalkeSlope * mTimeWalkeSlope * 0.64);
-  else
+  } else {
     mShowerResolution = 0;
+  }
 
   // efficiency parameters
-  mEffCenter = 0.995;    // efficiency in the center of the fired pad
-  mEffBoundary1 = 0.94;  // efficiency in mBound2
-  mEffBoundary2 = 0.833; // efficiency in the pad border
-  mEffBoundary3 = 0.1;   // efficiency in mBound3
+  mEffCenter = TOFSimParams::Instance().eff_center;       // efficiency in the center of the fired pad
+  mEffBoundary1 = TOFSimParams::Instance().eff_boundary1; // efficiency in mBound2
+  mEffBoundary2 = TOFSimParams::Instance().eff_boundary2; // efficiency in the pad border
+  mEffBoundary3 = TOFSimParams::Instance().eff_boundary3; // efficiency in mBound3
 }
 
 //______________________________________________________________________
@@ -552,12 +559,15 @@ void Digitizer::printParameters()
   printf("Efficiency in the pad center = %f\n", mEffCenter);
   printf("Efficiency in the pad border = %f\n", mEffBoundary2);
   printf("Time resolution = %f ps (shower=%f, digit=%f)\n", mTOFresolution, mShowerResolution, mDigitResolution);
-  if (mTimeSlope > 0)
+  if (mTimeSlope > 0) {
     printf("Degration resolution for pad with signal induced = %f ps/cm x border distance\n", mTimeSlope);
-  if (mTimeDelay > 0)
+  }
+  if (mTimeDelay > 0) {
     printf("Time delay for pad with signal induced = %f ps\n", mTimeDelay);
-  if (mTimeWalkeSlope > 0)
+  }
+  if (mTimeWalkeSlope > 0) {
     printf("Time walk ON = %f ps/cm\n", mTimeWalkeSlope);
+  }
 }
 
 //______________________________________________________________________
@@ -665,17 +675,20 @@ void Digitizer::test(const char* geo)
 
     hit->SetEnergyLoss(0.0001);
 
-    Int_t ndigits = processHit(*hit, mEventTime);
+    Int_t ndigits = processHit(*hit, mEventTime.getTimeOffsetWrtBC());
 
     h3->Fill(ndigits);
     hpadAll->Fill(xlocal, zlocal);
     for (Int_t k = 0; k < ndigits; k++) {
-      if (k == 0)
+      if (k == 0) {
         h->Fill(getTimeLastHit(k));
-      if (k == 0)
+      }
+      if (k == 0) {
         h2->Fill(getTotLastHit(k));
-      if (k == 0 && getXshift(k) == 0 && getZshift(k) == 0)
+      }
+      if (k == 0 && getXshift(k) == 0 && getZshift(k) == 0) {
         hTimeWalk->Fill(xlocal, zlocal * (0.5 - detCur[3]) * 2, getTimeLastHit(k));
+      }
 
       hpad[getXshift(k) + 1][-getZshift(k) + 1]->Fill(getTimeLastHit(k));
       hpadHit[getXshift(k) + 1][-getZshift(k) + 1]->Fill(xlocal, zlocal);
@@ -714,8 +727,9 @@ void Digitizer::test(const char* geo)
     for (Int_t j = 0; j < 3; j++) {
       cpadH->cd(j * 3 + i + 1);
       hpadHit[i][j]->Draw("colz");
-      if (j != 1)
+      if (j != 1) {
         hpadHit[i][j]->Scale(2);
+      }
       hpadEff[i][j]->Divide(hpadHit[i][j], hpadAll, 1, 1, "B");
       hpadEff[i][j]->Draw("surf");
       hpadEff[i][j]->SetMaximum(1);
@@ -760,7 +774,7 @@ void Digitizer::testFromHits(const char* geo, const char* hits)
 
       hit->SetEnergyLoss(t->GetLeaf("o2root.TOF.TOFHit.mELoss")->GetValue(j));
 
-      Int_t ndigits = processHit(*hit, mEventTime);
+      Int_t ndigits = processHit(*hit, mEventTime.getTimeOffsetWrtBC());
 
       h3->Fill(ndigits);
       for (Int_t k = 0; k < ndigits; k++) {
@@ -798,6 +812,9 @@ void Digitizer::fillOutputContainer(std::vector<Digit>& digits)
     int first = mDigitsPerTimeFrame.size();
     int ne = digits.size();
     ReadoutWindowData info(first, ne);
+    int orbit_shift = mReadoutWindowData.size() / 3;
+    int bc_shift = (mReadoutWindowData.size() % 3) * Geo::BC_IN_WINDOW;
+    info.setBCData(mFirstIR.orbit + orbit_shift, mFirstIR.bc + bc_shift);
     mDigitsPerTimeFrame.insert(mDigitsPerTimeFrame.end(), digits.begin(), digits.end());
     mReadoutWindowData.push_back(info);
   }
@@ -813,20 +830,23 @@ void Digitizer::fillOutputContainer(std::vector<Digit>& digits)
     }
   }
 
-  if (mContinuous)
+  if (mContinuous) {
     mMCTruthOutputContainerPerTimeFrame.push_back(*mMCTruthOutputContainer);
+  }
   mMCTruthContainerCurrent->clear();
 
   // switch to next mStrip after flushing current readout window data
   mIcurrentReadoutWindow++;
-  if (mIcurrentReadoutWindow >= MAXWINDOWS)
+  if (mIcurrentReadoutWindow >= MAXWINDOWS) {
     mIcurrentReadoutWindow = 0;
+  }
   mStripsCurrent = &(mStrips[mIcurrentReadoutWindow]);
   mMCTruthContainerCurrent = &(mMCTruthContainer[mIcurrentReadoutWindow]);
   int k = mIcurrentReadoutWindow + 1;
   for (Int_t i = 0; i < MAXWINDOWS - 1; i++) {
-    if (k >= MAXWINDOWS)
+    if (k >= MAXWINDOWS) {
       k = 0;
+    }
     mMCTruthContainerNext[i] = &(mMCTruthContainer[k]);
     mStripsNext[i] = &(mStrips[k]);
     k++;
@@ -837,10 +857,9 @@ void Digitizer::fillOutputContainer(std::vector<Digit>& digits)
 void Digitizer::flushOutputContainer(std::vector<Digit>& digits)
 { // flush all residual buffered data
   // TO be implemented
-  printf("flushOutputContainer\n");
-  if (!mContinuous)
+  if (!mContinuous) {
     fillOutputContainer(digits);
-  else {
+  } else {
     for (Int_t i = 0; i < MAXWINDOWS; i++) {
       fillOutputContainer(digits); // fill all windows which are before (not yet stored) of the new current one
       checkIfReuseFutureDigits();
@@ -864,23 +883,23 @@ void Digitizer::flushOutputContainer(std::vector<Digit>& digits)
 //______________________________________________________________________
 void Digitizer::checkIfReuseFutureDigits()
 {
+  uint64_t bclimit = 999999999999999999;
+
   // check if digits stored very far in future match the new readout windows currently available
   int idigit = mFutureDigits.size() - 1;
 
-  int bclimit = 999999; // if bc is larger than this value stop the search  in the next loop since bc are ordered in descending order
-
   for (std::vector<Digit>::reverse_iterator digit = mFutureDigits.rbegin(); digit != mFutureDigits.rend(); ++digit) {
-
-    if (digit->getBC() > bclimit)
+    if (digit->getBC() > bclimit) {
       break;
+    }
 
     double timestamp = digit->getBC() * Geo::BC_TIME + digit->getTDC() * Geo::TDCBIN * 1E-3; // in ns
     int isnext = Int_t(timestamp * Geo::READOUTWINDOW_INV) - (mReadoutWindowCurrent + 1); // to be replaced with uncalibrated time
     int isIfOverlap = Int_t((timestamp - Geo::BC_TIME_INPS * Geo::OVERLAP_IN_BC * 1E-3) * Geo::READOUTWINDOW_INV) - (mReadoutWindowCurrent + 1); // to be replaced with uncalibrated time;
 
-    if (isnext == isIfOverlap)
+    if (isnext == isIfOverlap) {
       isIfOverlap = -1;
-    else if (isnext < 0 && isIfOverlap >= 0) {
+    } else if (isnext < 0 && isIfOverlap >= 0) {
       isnext = isIfOverlap;
       isIfOverlap = -1;
     } else if (isnext >= MAXWINDOWS && isIfOverlap < MAXWINDOWS) {

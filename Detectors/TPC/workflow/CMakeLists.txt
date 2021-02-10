@@ -23,10 +23,15 @@ o2_add_library(TPCWorkflow
                        src/LinkZSToDigitsSpec.cxx
                        src/TPCSectorCompletionPolicy.cxx
                        src/ZSSpec.cxx
+                       src/CalibProcessingHelper.cxx
+                       src/ClusterSharingMapSpec.cxx
+                       src/FileReaderWorkflow.cxx
+                       src/CalDetMergerPublisherSpec.cxx
                TARGETVARNAME targetName
                PUBLIC_LINK_LIBRARIES O2::Framework O2::DataFormatsTPC
                                      O2::DPLUtils O2::TPCReconstruction
-                                     O2::TPCCalibration O2::TPCSimulation)
+                                     O2::TPCCalibration O2::TPCSimulation
+                                     O2::DetectorsCalibration)
 
 o2_add_executable(reco-workflow
                   COMPONENT_NAME tpc
@@ -38,6 +43,21 @@ o2_add_executable(raw-to-digits-workflow
                   SOURCES src/tpc-raw-to-digits-workflow.cxx
                   PUBLIC_LINK_LIBRARIES O2::TPCWorkflow)
 
+o2_add_executable(calib-pedestal
+                  COMPONENT_NAME tpc
+                  SOURCES src/tpc-calib-pedestal.cxx
+                  PUBLIC_LINK_LIBRARIES O2::TPCWorkflow)
+
+o2_add_executable(track-reader
+                  COMPONENT_NAME tpc
+                  SOURCES src/TrackReaderWorkflow.cxx
+                  PUBLIC_LINK_LIBRARIES O2::TPCWorkflow)
+
+o2_add_executable(file-reader
+                  COMPONENT_NAME tpc
+                  SOURCES src/FileReaderWorkflow.cxx
+                  PUBLIC_LINK_LIBRARIES O2::TPCWorkflow)
+
 o2_add_test(workflow
             COMPONENT_NAME tpc
             LABELS tpc workflow
@@ -46,7 +66,7 @@ o2_add_test(workflow
             ENVIRONMENT O2_ROOT=${CMAKE_BINARY_DIR}/stage)
 
 if(GPUCA_EVENT_DISPLAY OR
-                       (OPENGL_FOUND AND GLFW_FOUND AND GLEW_FOUND AND OPENGL_GLU_FOUND
+                       (OPENGL_FOUND AND GLFW_FOUND AND TARGET AliceO2::DebugGUI AND OPENGL_GLU_FOUND
                        AND NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin"))
     target_compile_definitions(${targetName} PRIVATE GPUCA_BUILD_EVENT_DISPLAY)
 endif()

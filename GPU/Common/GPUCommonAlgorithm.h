@@ -114,32 +114,37 @@ GPUdi() I GPUCommonAlgorithm::MedianOf3Select(I f, I l, Cmp cmp) noexcept
   --l;
 
   if (cmp(*f, *m)) {
-    if (cmp(*m, *l))
+    if (cmp(*m, *l)) {
       return m;
-    else if (cmp(*f, *l))
+    } else if (cmp(*f, *l)) {
       return l;
-    else
+    } else {
       return f;
-  } else if (cmp(*f, *l))
+    }
+  } else if (cmp(*f, *l)) {
     return f;
-  else if (cmp(*m, *l))
+  } else if (cmp(*m, *l)) {
     return l;
-  else
+  } else {
     return m;
+  }
 }
 
 template <typename I, typename T, typename Cmp>
 GPUdi() I GPUCommonAlgorithm::UnguardedPartition(I f, I l, T piv, Cmp cmp) noexcept
 {
   do {
-    while (cmp(*f, piv))
+    while (cmp(*f, piv)) {
       ++f;
+    }
     --l;
-    while (cmp(piv, *l))
+    while (cmp(piv, *l)) {
       --l;
+    }
 
-    if (l <= f)
+    if (l <= f) {
       return f;
+    }
     IterSwap(f, l);
     ++f;
   } while (true);
@@ -148,10 +153,9 @@ GPUdi() I GPUCommonAlgorithm::UnguardedPartition(I f, I l, T piv, Cmp cmp) noexc
 template <typename I, typename Cmp>
 GPUdi() void GPUCommonAlgorithm::QuickSort(I f, I l, Cmp cmp) noexcept
 {
-  if (f == l)
-
+  if (f == l) {
     return;
-
+  }
   using IndexType = unsigned short;
 
   struct pair {
@@ -186,15 +190,19 @@ GPUdi() void GPUCommonAlgorithm::QuickSort(I f, I l, Cmp cmp) noexcept
     const auto lsz = pp - it0;
     const auto rsz = it1 - pp;
     if (lsz < rsz) {
-      if (rsz > cutoff)
+      if (rsz > cutoff) {
         s.emplace(pp - f, it1 - f);
-      if (lsz > cutoff)
+      }
+      if (lsz > cutoff) {
         s.emplace(it0 - f, pp - f);
+      }
     } else {
-      if (lsz > cutoff)
+      if (lsz > cutoff) {
         s.emplace(it0 - f, pp - f);
-      if (rsz > cutoff)
+      }
+      if (rsz > cutoff) {
         s.emplace(pp - f, it1 - f);
+      }
     }
   }
   InsertionSort(f, l, cmp);
@@ -212,7 +220,7 @@ typedef GPUCommonAlgorithm CAAlgo;
 } // namespace gpu
 } // namespace GPUCA_NAMESPACE
 
-#if (defined(__CUDACC__) && !defined(__clang__)) || defined(__HIPCC__)
+#if ((defined(__CUDACC__) && !defined(__clang__)) || defined(__HIPCC__))
 
 #include "GPUCommonAlgorithmThrust.h"
 
@@ -332,13 +340,15 @@ GPUdi() void GPUCommonAlgorithm::swap(T& a, T& b)
 #ifdef __OPENCL__
 // Nothing to do, work_group functions available
 
-#elif defined(__CUDACC__) || defined(__HIPCC__)
+#elif (defined(__CUDACC__) || defined(__HIPCC__))
 // CUDA and HIP work the same way using cub, need just different header
 
+#ifndef GPUCA_GPUCODE_GENRTC
 #if defined(__CUDACC__)
 #include <cub/cub.cuh>
 #elif defined(__HIPCC__)
 #include <hipcub/hipcub.hpp>
+#endif
 #endif
 
 #define work_group_scan_inclusive_add(v) work_group_scan_inclusive_add_FUNC(v, smem)
@@ -363,6 +373,16 @@ GPUdi() T work_group_broadcast_FUNC(T v, int i, S& smem)
   return retVal;
 }
 
+#define work_group_reduce_add(v) work_group_reduce_add_FUNC(v, smem)
+template <class T, class S>
+GPUdi() T work_group_reduce_add_FUNC(T v, S& smem)
+{
+  v = typename S::BlockReduce(smem.cubReduceTmpMem).Sum(v);
+  __syncthreads();
+  v = work_group_broadcast(v, 0);
+  return v;
+}
+
 #define warp_scan_inclusive_add(v) warp_scan_inclusive_add_FUNC(v, smem)
 template <class T, class S>
 GPUdi() T warp_scan_inclusive_add_FUNC(T v, S& smem)
@@ -376,6 +396,12 @@ GPUdi() T warp_scan_inclusive_add_FUNC(T v, S& smem)
 
 template <class T>
 GPUdi() T work_group_scan_inclusive_add(T v)
+{
+  return v;
+}
+
+template <class T>
+GPUdi() T work_group_reduce_add(T v)
 {
   return v;
 }

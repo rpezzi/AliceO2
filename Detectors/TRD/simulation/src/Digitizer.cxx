@@ -14,9 +14,9 @@
 #include "FairLogger.h"
 #include "DetectorsBase/GeometryManager.h"
 
-#include "TRDBase/TRDGeometry.h"
-#include "TRDBase/TRDSimParam.h"
-#include "TRDBase/TRDPadPlane.h"
+#include "TRDBase/Geometry.h"
+#include "TRDBase/SimParam.h"
+#include "TRDBase/PadPlane.h"
 #include "TRDBase/PadResponse.h"
 
 #include "TRDSimulation/Digitizer.h"
@@ -28,16 +28,17 @@
 #endif
 
 using namespace o2::trd;
+using namespace o2::trd::constants;
 using namespace o2::math_utils;
 
 // init method for late initialization
 void Digitizer::init()
 {
-  mGeo = TRDGeometry::instance();
+  mGeo = Geometry::instance();
   mGeo->createClusterMatrixArray();          // Requiered for chamberInGeometry()
   mPRF = new PadResponse();                  // Pad response function initialization
-  mSimParam = TRDSimParam::Instance();       // Instance for simulation parameters
-  mCommonParam = TRDCommonParam::Instance(); // Instance for common parameters
+  mSimParam = SimParam::Instance();          // Instance for simulation parameters
+  mCommonParam = CommonParam::Instance();    // Instance for common parameters
   if (!mSimParam) {
   }
   if (!mCommonParam) {
@@ -78,8 +79,8 @@ void Digitizer::setSimulationParameters()
   if (mSimParam->TRFOn()) {
     mTimeBinTRFend = ((int)(mSimParam->GetTRFhi() * mCommonParam->GetSamplingFrequency())) - 1;
   }
-  mMaxTimeBins = kTimeBins;     // for signals, usually set at 30 tb = 3 microseconds
-  mMaxTimeBinsTRAP = kTimeBins; // for adcs; should be read from the CCDB or the TRAP config
+  mMaxTimeBins = TIMEBINS;     // for signals, usually set at 30 tb = 3 microseconds
+  mMaxTimeBinsTRAP = TIMEBINS; // for adcs; should be read from the CCDB or the TRAP config
   mSamplingRate = mCommonParam->GetSamplingFrequency();
   mElAttachProp = mSimParam->GetElAttachProp() / 100;
 }
@@ -95,19 +96,21 @@ void Digitizer::flush(DigitContainer& digits, o2::dataformats::MCTruthContainer<
         LOG(WARN) << "TRD conversion of signals to digits failed";
       }
       for (const auto& iter : smc) {
-        labels.addElements(labels.getIndexedSize(), iter.second.labels);
+        if (iter.second.isDigit)
+          labels.addElements(labels.getIndexedSize(), iter.second.labels);
       }
     }
   } else {
     // since we don't have any pileup signals just flush the signals for each chamber
     // we avoid flattening the array<map, ndets> to a single map
-    for (const auto& smc : mSignalsMapCollection) {
+    for (auto& smc : mSignalsMapCollection) {
       bool status = convertSignalsToADC(smc, digits);
       if (!status) {
         LOG(WARN) << "TRD conversion of signals to digits failed";
       }
       for (const auto& iter : smc) {
-        labels.addElements(labels.getIndexedSize(), iter.second.labels);
+        if (iter.second.isDigit)
+          labels.addElements(labels.getIndexedSize(), iter.second.labels);
       }
     }
   }
@@ -119,7 +122,7 @@ SignalContainer Digitizer::addSignalsFromPileup()
   int count = 0;
   SignalContainer addedSignalsMap;
   for (const auto& collection : mPileupSignals) {
-    for (int det = 0; det < kNdet; ++det) {
+    for (int det = 0; det < MAXCHAMBER; ++det) {
       const auto& signalMap = collection[det]; //--> a map with active pads only for this chamber
       for (const auto& signal : signalMap) {   // loop over active pads only, if there is any
         const int& key = signal.first;
@@ -185,33 +188,6 @@ void Digitizer::clearContainers()
   }
 }
 
-int Digitizer::triggerEventProcessing(DigitContainer& digits, o2::dataformats::MCTruthContainer<MCLabel>& labels)
-{
-  if (mCurrentTriggerTime < 0 && mLastTime < 0) {
-    // very first event
-    mCurrentTriggerTime = mTime;
-    mLastTime = mTime;
-    return EventType::kFirstEvent;
-  }
-  if (mTime > mLastTime) {
-    if ((mTime - mCurrentTriggerTime) < BUSY_TIME) {
-      // send the signal containers to the pileup container, and do not change the current trigger time.
-      pileup();
-      mLastTime = mTime;
-      return EventType::kPileupEvent;
-    } else {
-      // flush the digits: signals from the pileup container are converted to adcs
-      // digits and labels are produced, and the current trigger time is changed after the flush is completed
-      flush(digits, labels);
-      mCurrentTriggerTime = mTime;
-      mLastTime = mTime;
-      return EventType::kTriggerFired;
-    }
-  } else {
-    return EventType::kEmbeddingEvent;
-  }
-}
-
 void Digitizer::process(std::vector<HitType> const& hits, DigitContainer& digits,
                         o2::dataformats::MCTruthContainer<MCLabel>& labels)
 {
@@ -219,10 +195,8 @@ void Digitizer::process(std::vector<HitType> const& hits, DigitContainer& digits
     LOG(FATAL) << "TRD Calibration database not available";
   }
 
-  int status = triggerEventProcessing(digits, labels);
-
   // Get the a hit container for all the hits in a given detector then call convertHits for a given detector (0 - 539)
-  std::array<std::vector<HitType>, kNdet> hitsPerDetector;
+  std::array<std::vector<HitType>, MAXCHAMBER> hitsPerDetector;
   getHitContainerPerDetector(hits, hitsPerDetector);
 
 #ifdef WITH_OPENMP
@@ -230,7 +204,7 @@ void Digitizer::process(std::vector<HitType> const& hits, DigitContainer& digits
 // Loop over all TRD detectors (in a parallel fashion)
 #pragma omp parallel for schedule(dynamic)
 #endif
-  for (int det = 0; det < kNdet; ++det) {
+  for (int det = 0; det < MAXCHAMBER; ++det) {
 #ifdef WITH_OPENMP
     const int threadid = omp_get_thread_num();
 #else
@@ -258,10 +232,10 @@ void Digitizer::process(std::vector<HitType> const& hits, DigitContainer& digits
   }
 }
 
-void Digitizer::getHitContainerPerDetector(const std::vector<HitType>& hits, std::array<std::vector<HitType>, kNdet>& hitsPerDetector)
+void Digitizer::getHitContainerPerDetector(const std::vector<HitType>& hits, std::array<std::vector<HitType>, MAXCHAMBER>& hitsPerDetector)
 {
   //
-  // Fill an array of size kNdet (540)
+  // Fill an array of size MAXCHAMBER (540)
   // The i-element of the array contains the hit collection for the i-detector
   // To be called once, before doing the loop over all detectors and process the hits
   //
@@ -279,7 +253,7 @@ bool Digitizer::convertHits(const int det, const std::vector<HitType>& hits, Sig
   double padSignal[mNpad];
 
   const double calExBDetValue = mCalib->getExB(det); // T * V/cm (check units)
-  const TRDPadPlane* padPlane = mGeo->getPadPlane(det);
+  const PadPlane* padPlane = mGeo->getPadPlane(det);
   const int layer = mGeo->getLayer(det);
   const float rowEndROC = padPlane->getRowEndROC();
   const float row0 = padPlane->getRow0ROC();
@@ -481,7 +455,7 @@ float drawGaus(o2::math_utils::RandomRing<>& normaldistRing, float mu, float sig
   return mu + sigma * normaldistRing.getNextValue();
 }
 
-bool Digitizer::convertSignalsToADC(const SignalContainer& signalMapCont, DigitContainer& digits, int thread)
+bool Digitizer::convertSignalsToADC(SignalContainer& signalMapCont, DigitContainer& digits, int thread)
 {
   //
   // Converts the sampled electron signals to ADC values for a given chamber
@@ -494,7 +468,7 @@ bool Digitizer::convertSignalsToADC(const SignalContainer& signalMapCont, DigitC
   double baseline = mSimParam->GetADCbaseline() / adcConvert;                   // The electronics baseline in mV
   double baselineEl = baseline / convert;                                       // The electronics baseline in electrons
 
-  for (const auto& signalMapIter : signalMapCont) {
+  for (auto& signalMapIter : signalMapCont) {
     const auto key = signalMapIter.first;
     const int det = getDetectorFromKey(key);
     const int row = getRowFromKey(key);
@@ -521,6 +495,7 @@ bool Digitizer::convertSignalsToADC(const SignalContainer& signalMapCont, DigitC
       LOG(FATAL) << "Not a valid gain " << padgain << ", " << det << ", " << col << ", " << row;
     }
 
+    signalMapIter.second.isDigit = true; // flag the signal as digit
     // Loop over the all timebins in the ADC array
     const auto& signalArray = signalMapIter.second.signals;
     ArrayADC adcs{};
@@ -544,7 +519,7 @@ bool Digitizer::convertSignalsToADC(const SignalContainer& signalMapCont, DigitC
       adcs[tb] = adc;
     } // loop over timebins
     // Convert the map to digits here, and push them to the container
-    digits.emplace_back(det, row, col, adcs, getEventTime());
+    digits.emplace_back(det, row, col, adcs);
   } // loop over digits
   return true;
 }

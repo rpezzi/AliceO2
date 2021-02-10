@@ -14,9 +14,11 @@
 #define ALICEO2_INTERACTIONRECORD_H
 
 #include "GPUCommonRtypes.h"
+#ifndef GPUCA_ALIGPUCODE
 #include <iosfwd>
-#include <cmath>
 #include <cstdint>
+#endif
+#include <cmath>
 #include "CommonConstants/LHCConstants.h"
 
 namespace o2
@@ -88,12 +90,24 @@ struct InteractionRecord {
 
   int64_t differenceInBC(const InteractionRecord& other) const
   {
-    // return differenc in bunch-crossings
+    // return difference in bunch-crossings
     int64_t diffBC = int(bc) - other.bc;
     if (orbit != other.orbit) {
       diffBC += (int64_t(orbit) - other.orbit) * o2::constants::lhc::LHCMaxBunches;
     }
     return diffBC;
+  }
+
+  float differenceInBCNS(const InteractionRecord& other) const
+  {
+    // return difference in bunch-crossings in ns
+    return differenceInBC(other) * o2::constants::lhc::LHCBunchSpacingNS;
+  }
+
+  float differenceInBCMS(const InteractionRecord& other) const
+  {
+    // return difference in bunch-crossings in ms
+    return differenceInBC(other) * o2::constants::lhc::LHCBunchSpacingMS;
   }
 
   int64_t toLong() const
@@ -232,10 +246,11 @@ struct InteractionRecord {
     return InteractionRecord(l % o2::constants::lhc::LHCMaxBunches, l / o2::constants::lhc::LHCMaxBunches);
   }
 
+#ifndef GPUCA_ALIGPUCODE
   void print() const;
-
+  std::string asString() const;
   friend std::ostream& operator<<(std::ostream& stream, InteractionRecord const& ir);
-
+#endif
   ClassDefNV(InteractionRecord, 3);
 };
 
@@ -309,9 +324,11 @@ struct InteractionTimeRecord : public InteractionRecord {
     return !((*this) > other);
   }
 
+#ifndef GPUCA_ALIGPUCODE
   void print() const;
-
+  std::string asString() const;
   friend std::ostream& operator<<(std::ostream& stream, InteractionTimeRecord const& ir);
+#endif
 
   ClassDefNV(InteractionTimeRecord, 1);
 };

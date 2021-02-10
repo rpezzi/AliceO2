@@ -24,11 +24,12 @@
 #include "TPCBase/CalDet.h"
 #include "TPCBase/CalArray.h"
 #include "TPCBase/Painter.h"
+#include "TPCBase/Utils.h"
 
 using namespace o2::tpc;
 
 template <class T>
-TCanvas* painter::draw(const CalDet<T>& calDet, int nbins1D, float xMin1D, float xMax1D)
+TCanvas* painter::draw(const CalDet<T>& calDet, int nbins1D, float xMin1D, float xMax1D, TCanvas* outputCanvas)
 {
   using DetType = CalDet<T>;
   using CalType = CalArray<T>;
@@ -76,8 +77,9 @@ TCanvas* painter::draw(const CalDet<T>& calDet, int nbins1D, float xMin1D, float
         const auto val = calDet.getValue(roc, irow, ipad);
         const GlobalPosition2D pos = mapper.getPadCentre(PadROCPos(roc, irow, ipad));
         const int bin = hist2D->FindBin(pos.X(), pos.Y());
-        if (!hist2D->GetBinContent(bin))
+        if (!hist2D->GetBinContent(bin)) {
           hist2D->SetBinContent(bin, val);
+        }
         hist1D->Fill(val);
       }
     }
@@ -91,7 +93,11 @@ TCanvas* painter::draw(const CalDet<T>& calDet, int nbins1D, float xMin1D, float
   }
 
   // ===| Draw histograms |=====================================================
-  auto c = new TCanvas(Form("c_%s", name.c_str()), title, 1000, 1000);
+  auto c = outputCanvas;
+  if (!c) {
+    c = new TCanvas(Form("c_%s", name.c_str()), title, 1000, 1000);
+  }
+  c->Clear();
   c->Divide(2, 2);
 
   c->cd(1);
@@ -129,10 +135,56 @@ TCanvas* painter::draw(const CalArray<T>& calArray)
 
 //______________________________________________________________________________
 template <class T>
-TH2* painter::getHistogram2D(const CalDet<T>& calDet, Side side)
+void painter::fillHistogram2D(TH2& h2D, const CalDet<T>& calDet, Side side)
 {
   static const Mapper& mapper = Mapper::instance();
 
+  for (ROC roc; !roc.looped(); ++roc) {
+    if (roc.side() != side) {
+      continue;
+    }
+
+    const int nrows = mapper.getNumberOfRowsROC(roc);
+    for (int irow = 0; irow < nrows; ++irow) {
+      const int npads = mapper.getNumberOfPadsInRowROC(roc, irow);
+      for (int ipad = 0; ipad < npads; ++ipad) {
+        const auto val = calDet.getValue(roc, irow, ipad);
+        const GlobalPosition2D pos = mapper.getPadCentre(PadROCPos(roc, irow, ipad));
+        const int bin = h2D.FindBin(pos.X(), pos.Y());
+        if (!h2D.GetBinContent(bin)) {
+          h2D.SetBinContent(bin, val);
+        }
+      }
+    }
+  }
+}
+
+//______________________________________________________________________________
+template <class T>
+void painter::fillHistogram2D(TH2& h2D, const CalArray<T>& calArray)
+{
+  static const Mapper& mapper = Mapper::instance();
+
+  const size_t position = calArray.getPadSubsetNumber();
+  const PadSubset padSubset = calArray.getPadSubset();
+  const int nrows = mapper.getNumberOfPadRows(padSubset, position);
+
+  // ===| fill hist |===========================================================
+  for (int irow = 0; irow < nrows; ++irow) {
+    const int padsInRow = mapper.getNumberOfPadsInRow(padSubset, position, irow);
+    for (int ipad = 0; ipad < padsInRow; ++ipad) {
+      const GlobalPadNumber pad = mapper.getPadNumber(padSubset, position, irow, ipad);
+      const auto val = calArray.getValue(pad);
+      const int cpad = ipad - padsInRow / 2;
+      h2D.Fill(irow, cpad, val);
+    }
+  }
+}
+
+//______________________________________________________________________________
+template <class T>
+TH2* painter::getHistogram2D(const CalDet<T>& calDet, Side side)
+{
   const auto title = calDet.getName().c_str();
   std::string name = calDet.getName();
   std::replace(name.begin(), name.end(), ' ', '_');
@@ -142,21 +194,7 @@ TH2* painter::getHistogram2D(const CalDet<T>& calDet, Side side)
                       Form("%s (%c-Side);x (cm);y (cm)", title, side_name),
                       300, -300, 300, 300, -300, 300);
 
-  for (ROC roc; !roc.looped(); ++roc) {
-    if (roc.side() != side)
-      continue;
-    const int nrows = mapper.getNumberOfRowsROC(roc);
-    for (int irow = 0; irow < nrows; ++irow) {
-      const int npads = mapper.getNumberOfPadsInRowROC(roc, irow);
-      for (int ipad = 0; ipad < npads; ++ipad) {
-        const auto val = calDet.getValue(roc, irow, ipad);
-        const GlobalPosition2D pos = mapper.getPadCentre(PadROCPos(roc, irow, ipad));
-        const int bin = h2D->FindBin(pos.X(), pos.Y());
-        if (!h2D->GetBinContent(bin))
-          h2D->SetBinContent(bin, val);
-      }
-    }
-  }
+  fillHistogram2D(*h2D, calDet, side);
 
   return h2D;
 }
@@ -168,11 +206,11 @@ TH2* painter::getHistogram2D(const CalArray<T>& calArray)
   static const Mapper& mapper = Mapper::instance();
 
   const size_t position = calArray.getPadSubsetNumber();
-
   const PadSubset padSubset = calArray.getPadSubset();
+
   // ===| maximum number of rows and pads |=====================================
   const int nrows = mapper.getNumberOfPadRows(padSubset, position);
-  const int npads = mapper.getNumberOfPadsInRow(padSubset, position, nrows - 1);
+  const int npads = mapper.getNumberOfPadsInRow(padSubset, position, nrows - 1) + 6;
 
   // ===| create histogram |====================================================
   const auto title = calArray.getName().c_str();
@@ -183,17 +221,8 @@ TH2* painter::getHistogram2D(const CalArray<T>& calArray)
                        nrows, 0., nrows,
                        npads, -npads / 2, npads / 2);
 
-  // ===| fill hist |===========================================================
-  for (int irow = 0; irow < nrows; ++irow) {
-    const int padsInRow = mapper.getNumberOfPadsInRow(padSubset, position, irow);
-    for (int ipad = 0; ipad < padsInRow; ++ipad) {
-      const GlobalPadNumber pad = mapper.getPadNumber(padSubset, position, irow, ipad);
-      const auto val = calArray.getValue(pad);
-      const int cpad = ipad - padsInRow / 2;
-      hist->Fill(irow, cpad, val);
-      //printf("%d %d: %f\n", irow, cpad, (double)val);
-    }
-  }
+  fillHistogram2D(*hist, calArray);
+
   return hist;
 }
 
@@ -210,7 +239,7 @@ std::enable_if_t<std::is_unsigned<T>::value, bool> hasData(const CalArray<T>& ca
 }
 
 template <class T>
-std::vector<TCanvas*> painter::makeSummaryCanvases(const CalDet<T>& calDet, int nbins1D, float xMin1D, float xMax1D, bool onlyFilled)
+std::vector<TCanvas*> painter::makeSummaryCanvases(const CalDet<T>& calDet, int nbins1D, float xMin1D, float xMax1D, bool onlyFilled, std::vector<TCanvas*>* outputCanvases)
 {
 
   std::vector<TCanvas*> vecCanvases;
@@ -233,14 +262,33 @@ std::vector<TCanvas*> painter::makeSummaryCanvases(const CalDet<T>& calDet, int 
   }
 
   // ===| set up canvases |===
+  TCanvas* cSides = nullptr;
+  TCanvas* cROCs1D = nullptr;
+  TCanvas* cROCs2D = nullptr;
   const std::string_view calName = calDet.getName();
-  auto cSides = draw(calDet, nbins1D, xMin1D, xMax1D);
-  auto cROCs1D = new TCanvas(fmt::format("c_ROCs_{}_1D", calName).data(), fmt::format("{} values for each ROC", calName).data(), 1400, 1000);
-  auto cROCs2D = new TCanvas(fmt::format("c_ROCs_{}_2D", calName).data(), fmt::format("{} values for each ROC", calName).data(), 1400, 1000);
+
+  if (outputCanvases) {
+    if (outputCanvases->size() < 3) {
+      LOGP(error, "At least 3 canvases are needed to fill the output, only {} given", outputCanvases->size());
+      return vecCanvases;
+    }
+
+    cSides = outputCanvases->at(0);
+    cROCs1D = outputCanvases->at(1);
+    cROCs2D = outputCanvases->at(2);
+    cSides->Clear();
+    cROCs1D->Clear();
+    cROCs2D->Clear();
+  } else {
+
+    cROCs1D = new TCanvas(fmt::format("c_ROCs_{}_1D", calName).data(), fmt::format("{} values for each ROC", calName).data(), 1400, 1000);
+    cROCs2D = new TCanvas(fmt::format("c_ROCs_{}_2D", calName).data(), fmt::format("{} values for each ROC", calName).data(), 1400, 1000);
+  }
   vecCanvases.emplace_back(cSides);
   vecCanvases.emplace_back(cROCs1D);
   vecCanvases.emplace_back(cROCs2D);
 
+  cSides = draw(calDet, nbins1D, xMin1D, xMax1D, cSides);
   cROCs1D->DivideSquare(nROCs);
   cROCs2D->DivideSquare(nROCs);
 
@@ -280,35 +328,56 @@ std::vector<TCanvas*> painter::makeSummaryCanvases(const CalDet<T>& calDet, int 
   return vecCanvases;
 }
 
+//==============================================================================
+std::vector<TCanvas*> painter::makeSummaryCanvases(const std::string_view fileName, const std::string_view calPadNames, int nbins1D, float xMin1D, float xMax1D, bool onlyFilled)
+{
+  using namespace o2::tpc;
+
+  const auto calPads = utils::readCalPads(fileName, calPadNames);
+
+  std::vector<TCanvas*> vecCanvases;
+
+  for (const auto calPad : calPads) {
+    auto canvases = makeSummaryCanvases(*calPad, nbins1D, xMin1D, xMax1D, onlyFilled);
+    for (auto c : canvases) {
+      vecCanvases.emplace_back(c);
+    }
+  }
+
+  return vecCanvases;
+}
+
 // ===| explicit instantiations |===============================================
 // this is required to force the compiler to create instances with the types
 // we usually would like to deal with
-template TCanvas* painter::draw<float>(const CalDet<float>& calDet, int, float, float);
-template std::vector<TCanvas*> painter::makeSummaryCanvases<float>(const CalDet<float>& calDet, int, float, float, bool);
+template TCanvas* painter::draw<float>(const CalDet<float>& calDet, int, float, float, TCanvas*);
+template std::vector<TCanvas*> painter::makeSummaryCanvases<float>(const CalDet<float>& calDet, int, float, float, bool, std::vector<TCanvas*>*);
 template TCanvas* painter::draw<float>(const CalArray<float>& calArray);
+template void painter::fillHistogram2D<float>(TH2& h2D, const CalDet<float>& calDet, Side side);
+template void painter::fillHistogram2D<float>(TH2& h2D, const CalArray<float>& calArray);
 template TH2* painter::getHistogram2D<float>(const CalDet<float>& calDet, Side side);
 template TH2* painter::getHistogram2D<float>(const CalArray<float>& calArray);
 
-template TCanvas* painter::draw<double>(const CalDet<double>& calDet, int, float, float);
-template std::vector<TCanvas*> painter::makeSummaryCanvases<double>(const CalDet<double>& calDet, int, float, float, bool);
+template TCanvas* painter::draw<double>(const CalDet<double>& calDet, int, float, float, TCanvas*);
+template std::vector<TCanvas*> painter::makeSummaryCanvases<double>(const CalDet<double>& calDet, int, float, float, bool, std::vector<TCanvas*>*);
 template TCanvas* painter::draw<double>(const CalArray<double>& calArray);
 template TH2* painter::getHistogram2D<double>(const CalDet<double>& calDet, Side side);
 template TH2* painter::getHistogram2D<double>(const CalArray<double>& calArray);
 
-template TCanvas* painter::draw<int>(const CalDet<int>& calDet, int, float, float);
-template std::vector<TCanvas*> painter::makeSummaryCanvases<int>(const CalDet<int>& calDet, int, float, float, bool);
+template TCanvas* painter::draw<int>(const CalDet<int>& calDet, int, float, float, TCanvas*);
+template std::vector<TCanvas*> painter::makeSummaryCanvases<int>(const CalDet<int>& calDet, int, float, float, bool, std::vector<TCanvas*>*);
 template TCanvas* painter::draw<int>(const CalArray<int>& calArray);
 template TH2* painter::getHistogram2D<int>(const CalDet<int>& calDet, Side side);
 template TH2* painter::getHistogram2D<int>(const CalArray<int>& calArray);
 
-template TCanvas* painter::draw<short>(const CalDet<short>& calDet, int, float, float);
-template std::vector<TCanvas*> painter::makeSummaryCanvases<short>(const CalDet<short>& calDet, int, float, float, bool);
+template TCanvas* painter::draw<short>(const CalDet<short>& calDet, int, float, float, TCanvas*);
+template std::vector<TCanvas*> painter::makeSummaryCanvases<short>(const CalDet<short>& calDet, int, float, float, bool, std::vector<TCanvas*>*);
 template TCanvas* painter::draw<short>(const CalArray<short>& calArray);
 template TH2* painter::getHistogram2D<short>(const CalDet<short>& calDet, Side side);
 template TH2* painter::getHistogram2D<short>(const CalArray<short>& calArray);
 
-template TCanvas* painter::draw<bool>(const CalDet<bool>& calDet, int, float, float);
-template std::vector<TCanvas*> painter::makeSummaryCanvases<bool>(const CalDet<bool>& calDet, int, float, float, bool);
+template TCanvas* painter::draw<bool>(const CalDet<bool>& calDet, int, float, float, TCanvas*);
+template std::vector<TCanvas*> painter::makeSummaryCanvases<bool>(const CalDet<bool>& calDet, int, float, float, bool, std::vector<TCanvas*>*);
 template TCanvas* painter::draw<bool>(const CalArray<bool>& calArray);
 template TH2* painter::getHistogram2D<bool>(const CalDet<bool>& calDet, Side side);
 template TH2* painter::getHistogram2D<bool>(const CalArray<bool>& calArray);

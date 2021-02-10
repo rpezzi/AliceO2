@@ -10,7 +10,7 @@
 #include "Framework/runDataProcessing.h"
 #include "Framework/AnalysisTask.h"
 #include "Framework/AnalysisDataModel.h"
-#include "Analysis/MC.h"
+#include "AnalysisCore/MC.h"
 
 #include <TH1F.h>
 #include <cmath>
@@ -39,7 +39,7 @@ struct BTask {
   {
     //LOGF(info, "MC. vtx-z = %f", mcCollision.posZ());
     LOGF(info, "First: %d | Length: %d", mcParticles.begin().index(), mcParticles.size());
-    LOGF(info, "Particles mother: %d", (mcParticles.begin() + 1000).mother()[0]);
+    LOGF(info, "Particles mother: %d", (mcParticles.begin() + 1000).mother0());
     for (auto& mcParticle : mcParticles) {
       if (MC::isPhysicalPrimary(mcParticles, mcParticle)) {
         phiH->Fill(mcParticle.phi());
@@ -64,10 +64,12 @@ struct CTask {
       //  continue;
       etaDiff->Fill(track.label().eta() - track.eta());
       auto delta = track.label().phi() - track.phi();
-      if (delta > M_PI)
+      if (delta > M_PI) {
         delta -= 2 * M_PI;
-      if (delta < -M_PI)
+      }
+      if (delta < -M_PI) {
         delta += 2 * M_PI;
+      }
       phiDiff->Fill(delta);
       //LOGF(info, "eta: %.2f %.2f \t phi: %.2f %.2f | %d", track.label().eta(), track.eta(), track.label().phi(), track.phi(), track.label().index());
     }

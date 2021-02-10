@@ -32,8 +32,12 @@ add_subdirectory(TPC)
 add_subdirectory(GlobalTracking)
 add_subdirectory(GlobalTrackingWorkflow)
 add_subdirectory(Vertexing)
+if(BUILD_ANALYSIS)
+add_subdirectory(AOD)
+endif()
 
 add_subdirectory(Calibration)
+add_subdirectory(DCS)
 
 if(BUILD_SIMULATION)
   add_subdirectory(gconfig)

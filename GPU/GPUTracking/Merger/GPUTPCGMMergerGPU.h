@@ -92,7 +92,7 @@ class GPUTPCGMMergerUnpackResetIds : public GPUTPCGMMergerGeneral
 class GPUTPCGMMergerResolve : public GPUTPCGMMergerGeneral
 {
  public:
-  struct GPUSharedMemory : public GPUTPCGMMergerTypes::GPUResolveSharedMemory {
+  struct GPUSharedMemory : public gputpcgmmergertypes::GPUResolveSharedMemory {
   };
 
 #if !defined(GPUCA_ALIROOT_LIB) || !defined(GPUCA_GPUCODE)
@@ -206,6 +206,15 @@ class GPUTPCGMMergerSortTracksPrepare : public GPUTPCGMMergerGeneral
 };
 
 class GPUTPCGMMergerFinalize : public GPUTPCGMMergerGeneral
+{
+ public:
+#if !defined(GPUCA_ALIROOT_LIB) || !defined(GPUCA_GPUCODE)
+  template <int iKernel = defaultKernel>
+  GPUd() static void Thread(int nBlocks, int nThreads, int iBlock, int iThread, GPUsharedref() GPUSharedMemory& smem, processorType& merger);
+#endif
+};
+
+class GPUTPCGMMergerMergeLoopers : public GPUTPCGMMergerGeneral
 {
  public:
 #if !defined(GPUCA_ALIROOT_LIB) || !defined(GPUCA_GPUCODE)

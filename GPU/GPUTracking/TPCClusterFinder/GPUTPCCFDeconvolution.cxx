@@ -25,14 +25,14 @@ GPUdii() void GPUTPCCFDeconvolution::Thread<0>(int nBlocks, int nThreads, int iB
 {
   Array2D<PackedCharge> chargeMap(reinterpret_cast<PackedCharge*>(clusterer.mPchargeMap));
   Array2D<uchar> isPeakMap(clusterer.mPpeakMap);
-  GPUTPCCFDeconvolution::countPeaksImpl(get_num_groups(0), get_local_size(0), get_group_id(0), get_local_id(0), smem, isPeakMap, chargeMap, clusterer.mPpositions, clusterer.mPmemory->counters.nPositions);
+  GPUTPCCFDeconvolution::deconvolutionImpl(get_num_groups(0), get_local_size(0), get_group_id(0), get_local_id(0), smem, isPeakMap, chargeMap, clusterer.mPpositions, clusterer.mPmemory->counters.nPositions);
 }
 
-GPUdii() void GPUTPCCFDeconvolution::countPeaksImpl(int nBlocks, int nThreads, int iBlock, int iThread, GPUSharedMemory& smem,
-                                                    const Array2D<uchar>& peakMap,
-                                                    Array2D<PackedCharge>& chargeMap,
-                                                    const ChargePos* positions,
-                                                    const uint digitnum)
+GPUdii() void GPUTPCCFDeconvolution::deconvolutionImpl(int nBlocks, int nThreads, int iBlock, int iThread, GPUSharedMemory& smem,
+                                                       const Array2D<uchar>& peakMap,
+                                                       Array2D<PackedCharge>& chargeMap,
+                                                       const ChargePos* positions,
+                                                       const uint digitnum)
 {
   SizeT idx = get_global_id(0);
 
@@ -49,7 +49,7 @@ GPUdii() void GPUTPCCFDeconvolution::countPeaksImpl(int nBlocks, int nThreads, i
   ushort partId = ll;
 
   ushort in3x3 = 0;
-  partId = CfUtils::partition(smem, ll, iamPeak, SCRATCH_PAD_WORK_GROUP_SIZE, &in3x3);
+  partId = CfUtils::partition<SCRATCH_PAD_WORK_GROUP_SIZE>(smem, ll, iamPeak, SCRATCH_PAD_WORK_GROUP_SIZE, &in3x3);
 
   if (partId < in3x3) {
     smem.posBcast1[partId] = pos;
@@ -63,17 +63,17 @@ GPUdii() void GPUTPCCFDeconvolution::countPeaksImpl(int nBlocks, int nThreads, i
     ll,
     0,
     8,
-    CfConsts::InnerNeighbors,
+    cfconsts::InnerNeighbors,
     smem.posBcast1,
     smem.buf);
 
   uchar aboveThreshold = 0;
   if (partId < in3x3) {
-    peakCount = countPeaksScratchpadInner(partId, smem.buf, &aboveThreshold);
+    peakCount = countPeaksInner(partId, smem.buf, &aboveThreshold);
   }
 
   ushort in5x5 = 0;
-  partId = CfUtils::partition(smem, partId, peakCount > 0 && !iamPeak, in3x3, &in5x5);
+  partId = CfUtils::partition<SCRATCH_PAD_WORK_GROUP_SIZE>(smem, partId, peakCount > 0 && !iamPeak, in3x3, &in5x5);
 
   if (partId < in5x5) {
     smem.posBcast1[partId] = pos;
@@ -88,13 +88,13 @@ GPUdii() void GPUTPCCFDeconvolution::countPeaksImpl(int nBlocks, int nThreads, i
     ll,
     0,
     16,
-    CfConsts::OuterNeighbors,
+    cfconsts::OuterNeighbors,
     smem.posBcast1,
     smem.aboveThresholdBcast,
     smem.buf);
 
   if (partId < in5x5) {
-    peakCount = countPeaksScratchpadOuter(partId, aboveThreshold, smem.buf);
+    peakCount = countPeaksOuter(partId, aboveThreshold, smem.buf);
     peakCount *= -1;
   }
 
@@ -114,7 +114,7 @@ GPUdii() void GPUTPCCFDeconvolution::countPeaksImpl(int nBlocks, int nThreads, i
   chargeMap[pos] = p;
 }
 
-GPUd() char GPUTPCCFDeconvolution::countPeaksScratchpadInner(
+GPUdi() char GPUTPCCFDeconvolution::countPeaksInner(
   ushort ll,
   const uchar* isPeak,
   uchar* aboveThreshold)
@@ -130,7 +130,7 @@ GPUd() char GPUTPCCFDeconvolution::countPeaksScratchpadInner(
   return peaks;
 }
 
-GPUd() char GPUTPCCFDeconvolution::countPeaksScratchpadOuter(
+GPUdi() char GPUTPCCFDeconvolution::countPeaksOuter(
   ushort ll,
   uchar aboveThreshold,
   const uchar* isPeak)

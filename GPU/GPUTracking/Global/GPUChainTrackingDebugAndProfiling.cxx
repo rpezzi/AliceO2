@@ -135,8 +135,10 @@ void GPUChainTracking::PrintMemoryStatistics()
 {
   std::map<std::string, GPUChainTrackingMemUsage> usageMap;
   for (int i = 0; i < NSLICES; i++) {
+#ifdef GPUCA_TPC_GEOMETRY_O2
     addToMap("TPC Clusterer Sector Peaks", usageMap, processors()->tpcClusterer[i].mPmemory->counters.nPeaks, processors()->tpcClusterer[i].mNMaxPeaks);
     addToMap("TPC Clusterer Sector Clusters", usageMap, processors()->tpcClusterer[i].mPmemory->counters.nClusters, processors()->tpcClusterer[i].mNMaxClusters);
+#endif
     addToMap("TPC Start Hits", usageMap, *processors()->tpcTrackers[i].NStartHits(), processors()->tpcTrackers[i].NMaxStartHits());
     addToMap("TPC Tracklets", usageMap, *processors()->tpcTrackers[i].NTracklets(), processors()->tpcTrackers[i].NMaxTracklets());
     addToMap("TPC TrackletHits", usageMap, *processors()->tpcTrackers[i].NRowHits(), processors()->tpcTrackers[i].NMaxRowHits());
@@ -185,4 +187,41 @@ void GPUChainTracking::PrintDebugOutput()
   TransferMemoryResourcesToHost(RecoStep::NoRecoStep, &processors()->debugOutput, -1);
   processors()->debugOutput.Print();
 #endif
+}
+
+void GPUChainTracking::PrintOutputStat()
+{
+  int nTracks = 0, nAttachedClusters = 0, nAttachedClustersFitted = 0, nAdjacentClusters = 0;
+  unsigned int nCls = GetProcessingSettings().doublePipeline ? mIOPtrs.clustersNative->nClustersTotal : GetTPCMerger().NMaxClusters();
+  if (ProcessingSettings().createO2Output > 1) {
+    nTracks = mIOPtrs.nOutputTracksTPCO2;
+    nAttachedClusters = mIOPtrs.nMergedTrackHits;
+  } else {
+    for (unsigned int k = 0; k < mIOPtrs.nMergedTracks; k++) {
+      if (mIOPtrs.mergedTracks[k].OK()) {
+        nTracks++;
+        nAttachedClusters += mIOPtrs.mergedTracks[k].NClusters();
+        nAttachedClustersFitted += mIOPtrs.mergedTracks[k].NClustersFitted();
+      }
+    }
+    for (unsigned int k = 0; k < nCls; k++) {
+      int attach = mIOPtrs.mergedTrackHitAttachment[k];
+      if (attach & gputpcgmmergertypes::attachFlagMask) {
+        nAdjacentClusters++;
+      }
+    }
+  }
+
+  char trdText[1024] = "";
+  if (GetRecoSteps() & GPUDataTypes::RecoStep::TRDTracking) {
+    int nTRDTracks = 0;
+    int nTRDTracklets = 0;
+    for (unsigned int k = 0; k < mIOPtrs.nTRDTracks; k++) {
+      auto& trk = mIOPtrs.trdTracks[k];
+      nTRDTracklets += trk.GetNtracklets();
+      nTRDTracks += trk.GetNtracklets() != 0;
+    }
+    snprintf(trdText, 1024, " - TRD Tracker reconstructed %d tracks (%d tracklets)", nTRDTracks, nTRDTracklets);
+  }
+  printf("Output Tracks: %d (%d / %d / %d / %d clusters (fitted / attached / adjacent / total))%s\n", nTracks, nAttachedClustersFitted, nAttachedClusters, nAdjacentClusters, nCls, trdText);
 }

@@ -13,10 +13,10 @@
 /// @since  2020-01-25
 /// @brief  TOF compressed data inspector task
 
-#include "TOFWorkflow/CompressedInspectorTask.h"
+#include "TOFWorkflowUtils/CompressedInspectorTask.h"
 #include "Framework/ControlService.h"
 #include "Framework/ConfigParamRegistry.h"
-
+#include "Framework/Logger.h"
 #include "Headers/RAWDataHeader.h"
 #include "DataFormatsTOF/CompressedDataFormat.h"
 
@@ -36,6 +36,9 @@ void CompressedInspectorTask<RDH>::init(InitContext& ic)
 {
   LOG(INFO) << "CompressedInspector init";
   auto filename = ic.options().get<std::string>("tof-compressed-inspector-filename");
+  auto verbose = ic.options().get<bool>("tof-compressed-inspector-decoder-verbose");
+
+  DecoderBaseT<RDH>::setDecoderVerbose(verbose);
 
   /** open file **/
   if (mFile && mFile->IsOpen()) {
@@ -62,13 +65,17 @@ void CompressedInspectorTask<RDH>::init(InitContext& ic)
   mHistos1D["errorBit"] = new TH1F("hErrorBit", ";TDC error bit", 15, 0., 15.);
   mHistos2D["error"] = new TH2F("hError", ";slot;TDC", 24, 1., 13., 15, 0., 15.);
   mHistos2D["test"] = new TH2F("hTest", ";slot;TDC", 24, 1., 13., 15, 0., 15.);
+  mHistos2D["crateBC"] = new TH2F("hCrateBC", ";crate;BC", 72, 0., 72., 4096, 0., 4096.);
+  mHistos2D["crateOrbit"] = new TH2F("hCrateOrbit", ";crate;orbit", 72, 0., 72., 4096, 0., 4096.);
 
   auto finishFunction = [this]() {
     LOG(INFO) << "CompressedInspector finish";
-    for (auto& histo : mHistos1D)
+    for (auto& histo : mHistos1D) {
       histo.second->Write();
-    for (auto& histo : mHistos2D)
+    }
+    for (auto& histo : mHistos2D) {
       histo.second->Write();
+    }
     mFile->Close();
   };
   ic.services().get<CallbackService>().set(CallbackService::Id::Stop, finishFunction);
@@ -87,8 +94,9 @@ void CompressedInspectorTask<RDH>::run(ProcessingContext& pc)
 
   /** loop over inputs routes **/
   for (auto iit = pc.inputs().begin(), iend = pc.inputs().end(); iit != iend; ++iit) {
-    if (!iit.isValid())
+    if (!iit.isValid()) {
       continue;
+    }
 
     /** loop over input parts **/
     for (auto const& ref : iit) {
@@ -107,9 +115,14 @@ void CompressedInspectorTask<RDH>::run(ProcessingContext& pc)
 template <typename RDH>
 void CompressedInspectorTask<RDH>::headerHandler(const CrateHeader_t* crateHeader, const CrateOrbit_t* crateOrbit)
 {
-  for (int ibit = 0; ibit < 11; ++ibit)
-    if (crateHeader->slotPartMask & (1 << ibit))
+  mHistos2D["crateBC"]->Fill(crateHeader->drmID, crateHeader->bunchID);
+  mHistos2D["crateOrbit"]->Fill(crateHeader->drmID, crateOrbit->orbitID % 4096);
+
+  for (int ibit = 0; ibit < 11; ++ibit) {
+    if (crateHeader->slotPartMask & (1 << ibit)) {
       mHistos2D["slotPartMask"]->Fill(crateHeader->drmID, ibit + 2);
+    }
+  }
 };
 
 template <typename RDH>
@@ -155,8 +168,9 @@ void CompressedInspectorTask<RDH>::trailerHandler(const CrateHeader_t* crateHead
       nError++;
       mHistos2D["error"]->Fill(error->slotID + 0.5 * error->chain, error->tdcID);
       for (int ibit = 0; ibit < 15; ++ibit) {
-        if (error->errorFlags & (1 << ibit))
+        if (error->errorFlags & (1 << ibit)) {
           mHistos1D["errorBit"]->Fill(ibit);
+        }
       }
     }
   }

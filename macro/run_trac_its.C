@@ -31,12 +31,14 @@
 #include "DetectorsCommonDataFormats/NameConf.h"
 #endif
 
+#include "ReconstructionDataFormats/PrimaryVertex.h" // hack to silence JIT compiler
 #include "ITStracking/ROframe.h"
 #include "ITStracking/IOUtils.h"
 #include "ITStracking/Vertexer.h"
 #include "ITStracking/VertexerTraits.h"
 
 using MCLabCont = o2::dataformats::MCTruthContainer<o2::MCCompLabel>;
+using MCLabContTr = std::vector<o2::MCCompLabel>;
 using Vertex = o2::dataformats::Vertex<o2::dataformats::TimeStamp<int>>;
 
 void run_trac_its(std::string path = "./", std::string outputfile = "o2trac_its.root",
@@ -72,7 +74,7 @@ void run_trac_its(std::string path = "./", std::string outputfile = "o2trac_its.
 
   o2::base::GeometryManager::loadGeometry(inputGeom);
   auto gman = o2::its::GeometryTGeo::Instance();
-  gman->fillMatrixCache(o2::utils::bit2Mask(o2::TransformType::T2GRot)); // request cached transforms
+  gman->fillMatrixCache(o2::math_utils::bit2Mask(o2::math_utils::TransformType::T2GRot)); // request cached transforms
 
   o2::base::Propagator::initFieldFromGRP(grp);
   auto field = static_cast<o2::field::MagneticField*>(TGeoGlobalMagField::Instance()->GetField());
@@ -140,7 +142,7 @@ void run_trac_its(std::string path = "./", std::string outputfile = "o2trac_its.
   std::vector<o2::itsmft::ROFRecord> vertROFvec, *vertROFvecPtr = &vertROFvec;
   std::vector<Vertex> vertices, *verticesPtr = &vertices;
 
-  MCLabCont trackLabels, *trackLabelsPtr = &trackLabels;
+  MCLabContTr trackLabels, *trackLabelsPtr = &trackLabels;
   outTree.Branch("ITSTrack", &tracksITSPtr);
   outTree.Branch("ITSTrackClusIdx", &trackClIdxPtr);
   outTree.Branch("ITSTrackMCTruth", &trackLabelsPtr);
@@ -164,7 +166,7 @@ void run_trac_its(std::string path = "./", std::string outputfile = "o2trac_its.
 
   o2::its::VertexerTraits vertexerTraits;
   o2::its::Vertexer vertexer(&vertexerTraits);
-  o2::its::ROframe event(0);
+  o2::its::ROframe event(0, 7);
 
   gsl::span<const unsigned char> patt(patterns->data(), patterns->size());
   auto pattIt = patt.begin();

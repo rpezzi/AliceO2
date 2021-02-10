@@ -34,6 +34,7 @@ Decoder::Decoder()
     mBuffer[i] = nullptr;
     mCruIn[i] = false;
   }
+  clearCounts();
 }
 
 bool Decoder::open(const std::string name)
@@ -78,8 +79,9 @@ bool Decoder::open(const std::string name)
 
   char* pos = new char[fullsize]; //mBufferLocal.data();
   for (int i = 0; i < NCRU; i++) {
-    if (!mCruIn[i])
+    if (!mCruIn[i]) {
       continue;
+    }
 
     mBuffer[i] = pos;
 
@@ -101,8 +103,9 @@ bool Decoder::open(const std::string name)
 bool Decoder::close()
 {
   for (int i = 0; i < NCRU; i++) {
-    if (mFile[i].is_open())
+    if (mFile[i].is_open()) {
       mFile[i].close();
+    }
   }
   return false;
 }
@@ -110,84 +113,95 @@ bool Decoder::close()
 void Decoder::clear()
 {
   reset();
+  if (mMaskNoiseRate > 0) {
+    clearCounts();
+  }
+
+  mPatterns.clear();
+  mCratePatterns.clear();
+  mCrateHeaderData.clear();
+  mErrors.clear();
 }
 
-void Decoder::InsertDigit(int icrate, int itrm, int itdc, int ichain, int channel, int orbit, int bunchid, int time_ext, int tdc, int tot)
+void Decoder::InsertDigit(int icrate, int itrm, int itdc, int ichain, int channel, uint32_t orbit, uint16_t bunchid, int time_ext, int tdc, int tot)
 {
-  std::array<int, 6> digitInfo;
+  DigitInfo digitInfo;
 
   fromRawHit2Digit(icrate, itrm, itdc, ichain, channel, orbit, bunchid, time_ext + tdc, tot, digitInfo);
+  if (mMaskNoiseRate > 0) {
+    mChannelCounts[digitInfo.channel]++;
+  }
 
   mHitDecoded++;
 
-  int isnext = digitInfo[3] * Geo::BC_IN_WINDOW_INV;
+  uint64_t isnext = digitInfo.bcAbs * Geo::BC_IN_WINDOW_INV;
 
-  if (isnext >= MAXWINDOWS) { // accumulate all digits which are not in the first windows
-
-    insertDigitInFuture(digitInfo[0], digitInfo[1], digitInfo[2], digitInfo[3], 0, digitInfo[4], digitInfo[5]);
+  if (isnext >= uint64_t(MAXWINDOWS)) { // accumulate all digits which are not in the first windows
+    insertDigitInFuture(digitInfo.channel, digitInfo.tdc, digitInfo.tot, digitInfo.bcAbs, 0, digitInfo.orbit, digitInfo.bc);
   } else {
     std::vector<Strip>* cstrip = mStripsCurrent; // first window
-    if (isnext)
+    if (isnext) {
       cstrip = mStripsNext[isnext - 1]; // next window
-
-    UInt_t istrip = digitInfo[0] / Geo::NPADS;
+    }
+    UInt_t istrip = digitInfo.channel / Geo::NPADS;
 
     // add digit
-    fillDigitsInStrip(cstrip, digitInfo[0], digitInfo[1], digitInfo[2], digitInfo[3], istrip);
+    fillDigitsInStrip(cstrip, digitInfo.channel, digitInfo.tdc, digitInfo.tot, digitInfo.bcAbs, istrip);
   }
 }
 
-void Decoder::readTRM(int icru, int icrate, int orbit, int bunchid)
+void Decoder::readTRM(int icru, int icrate, uint32_t orbit, uint16_t bunchid)
 {
 
-  if (orbit < mFirstOrbit || (orbit == mFirstOrbit && bunchid < mFirstBunch)) {
-    mFirstOrbit = orbit;
-    mFirstBunch = bunchid;
+  if (orbit < mFirstIR.orbit || (orbit == mFirstIR.orbit && bunchid < mFirstIR.bc)) {
+    mFirstIR.orbit = orbit;
+    mFirstIR.bc = bunchid;
   }
 
-  if (mVerbose)
+  if (mVerbose) {
     printTRMInfo(icru);
+  }
   int nhits = mUnion[icru]->frameHeader.numberOfHits;
   int time_ext = mUnion[icru]->frameHeader.frameID << 13;
   int itrm = mUnion[icru]->frameHeader.trmID;
   int deltaBC = mUnion[icru]->frameHeader.deltaBC;
 
-  if (deltaBC != 0)
+  if (deltaBC != 0) {
     printf("DeltaBC = %d\n", deltaBC);
+  }
   mUnion[icru]++;
   mIntegratedBytes[icru] += 4;
 
-  // read hits
-  Int_t channel, echannel;
-  Int_t tdc;
-  Int_t tot;
-  Int_t bc;
-  Int_t time;
-
-  std::array<int, 6> digitInfo;
+  DigitInfo digitInfo;
 
   for (int i = 0; i < nhits; i++) {
-    fromRawHit2Digit(icrate, itrm, mUnion[icru]->packedHit.tdcID, mUnion[icru]->packedHit.chain, mUnion[icru]->packedHit.channel, orbit, bunchid, time_ext + mUnion[icru]->packedHit.time, mUnion[icru]->packedHit.tot, digitInfo);
+    fromRawHit2Digit(icrate, itrm, mUnion[icru]->packedHit.tdcID, mUnion[icru]->packedHit.chain, mUnion[icru]->packedHit.channel, orbit, bunchid,
+                     time_ext + mUnion[icru]->packedHit.time, mUnion[icru]->packedHit.tot, digitInfo);
+    if (mMaskNoiseRate > 0) {
+      mChannelCounts[digitInfo.channel]++;
+    }
 
     mHitDecoded++;
 
-    if (mVerbose)
+    if (mVerbose) {
       printHitInfo(icru);
+    }
 
-    int isnext = digitInfo[3] * Geo::BC_IN_WINDOW_INV;
+    uint64_t isnext = digitInfo.bcAbs * Geo::BC_IN_WINDOW_INV;
 
     if (isnext >= MAXWINDOWS) { // accumulate all digits which are not in the first windows
 
-      insertDigitInFuture(digitInfo[0], digitInfo[1], digitInfo[2], digitInfo[3], 0, digitInfo[4], digitInfo[5]);
+      insertDigitInFuture(digitInfo.channel, digitInfo.tdc, digitInfo.tot, digitInfo.bcAbs, 0, digitInfo.orbit, digitInfo.bc);
     } else {
       std::vector<Strip>* cstrip = mStripsCurrent; // first window
-      if (isnext)
+      if (isnext) {
         cstrip = mStripsNext[isnext - 1]; // next window
+      }
 
-      UInt_t istrip = digitInfo[0] / Geo::NPADS;
+      UInt_t istrip = digitInfo.channel / Geo::NPADS;
 
       // add digit
-      fillDigitsInStrip(cstrip, digitInfo[0], digitInfo[1], digitInfo[2], digitInfo[3], istrip);
+      fillDigitsInStrip(cstrip, digitInfo.channel, digitInfo.tdc, digitInfo.tot, digitInfo.bcAbs, istrip);
     }
 
     mUnion[icru]++;
@@ -195,21 +209,17 @@ void Decoder::readTRM(int icru, int icrate, int orbit, int bunchid)
   }
 }
 
-void Decoder::fromRawHit2Digit(int icrate, int itrm, int itdc, int ichain, int channel, int orbit, int bunchid, int tdc, int tot, std::array<int, 6>& digitInfo)
+void Decoder::fromRawHit2Digit(int icrate, int itrm, int itdc, int ichain, int channel, uint32_t orbit, uint16_t bunchid, int tdc, int tot, Decoder::DigitInfo& dinfo)
 {
   // convert raw info in digit info (channel, tdc, tot, bc)
   // tdc = packetHit.time + (frameHeader.frameID << 13)
   int echannel = Geo::getECHFromIndexes(icrate, itrm, ichain, itdc, channel);
-  digitInfo[0] = Geo::getCHFromECH(echannel);
-  digitInfo[2] = tot;
-
-  digitInfo[3] = int(orbit * o2::tof::Geo::BC_IN_ORBIT);
-  digitInfo[3] += bunchid;
-  digitInfo[3] += tdc / 1024;
-  digitInfo[1] = tdc % 1024;
-
-  digitInfo[4] = orbit;
-  digitInfo[5] = bunchid;
+  dinfo.channel = Geo::getCHFromECH(echannel);
+  dinfo.tot = tot;
+  dinfo.bcAbs = uint64_t(orbit) * o2::tof::Geo::BC_IN_ORBIT + bunchid + tdc / 1024;
+  dinfo.tdc = tdc % 1024;
+  dinfo.orbit = orbit;
+  dinfo.bc = bunchid;
 }
 
 char* Decoder::nextPage(void* current, int shift)
@@ -223,8 +233,8 @@ char* Decoder::nextPage(void* current, int shift)
 bool Decoder::decode() // return a vector of digits in a TOF readout window
 {
   mReadoutWindowCurrent = 0;
-  mFirstOrbit = 0;
-  mFirstBunch = 0;
+  mFirstIR.orbit = 0;
+  mFirstIR.bc = 0;
 
 #ifdef VERBOSE
   if (mVerbose)
@@ -233,20 +243,21 @@ bool Decoder::decode() // return a vector of digits in a TOF readout window
   auto start = std::chrono::high_resolution_clock::now();
 
   // start from the beginning of the timeframe
-  mEventTime = 0;
 
   // loop over CRUs
   for (int icru = 0; icru < NCRU; icru++) {
-    if (!mCruIn[icru])
+    if (!mCruIn[icru]) {
       continue; // no data stream available for this cru
+    }
 
     printf("decoding cru %d\n", icru);
 
     while (mUnion[icru] < mUnionEnd[icru]) { // read all the buffer
       // read open RDH
       mRDH = reinterpret_cast<o2::header::RAWDataHeader*>(mUnion[icru]);
-      if (mVerbose)
+      if (mVerbose) {
         printRDH();
+      }
 
       // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       // note that RDH continue is not yet considered as option (to be added)
@@ -258,21 +269,24 @@ bool Decoder::decode() // return a vector of digits in a TOF readout window
       mUnion[icru] = reinterpret_cast<Union_t*>(shift + rdhsz);
       mIntegratedBytes[icru] += rdhsz;
 
-      if (mUnion[icru] >= mUnionEnd[icru])
+      if (mUnion[icru] >= mUnionEnd[icru]) {
         continue; // end of data stream reac
+      }
       for (int window = 0; window < Geo::NWINDOW_IN_ORBIT; window++) {
         // read Crate Header
         int bunchid = mUnion[icru]->crateHeader.bunchID;
         int icrate = mUnion[icru]->crateHeader.drmID;
-        if (mVerbose)
+        if (mVerbose) {
           printCrateInfo(icru);
+        }
         mUnion[icru]++;
         mIntegratedBytes[icru] += 4;
 
         //read Orbit
         int orbit = mUnion[icru]->crateOrbit.orbitID;
-        if (mVerbose)
-          printf("orbit ID      = %d\n", orbit);
+        if (mVerbose) {
+          printf("%d) orbit ID      = %d -- bunch ID = %d\n", icrate, orbit, bunchid);
+        }
         mUnion[icru]++;
         mIntegratedBytes[icru] += 4;
 
@@ -281,8 +295,9 @@ bool Decoder::decode() // return a vector of digits in a TOF readout window
         }
 
         // read Crate Trailer
-        if (mVerbose)
+        if (mVerbose) {
           printCrateTrailerInfo(icru);
+        }
         auto ndw = mUnion[icru]->crateTrailer.numberOfDiagnostics;
         mUnion[icru]++;
         mIntegratedBytes[icru] += 4;
@@ -296,8 +311,9 @@ bool Decoder::decode() // return a vector of digits in a TOF readout window
 
       // read close RDH
       mRDH = reinterpret_cast<o2::header::RAWDataHeader*>(nextPage(mRDH, RDHUtils::getMemorySize(*mRDH)));
-      if (mVerbose)
+      if (mVerbose) {
         printRDH();
+      }
       mIntegratedBytes[icru] += RDHUtils::getHeaderSize(*mRDH);
 
       // go to next page
@@ -316,7 +332,6 @@ void Decoder::FillWindows()
 {
   std::vector<Digit> digTemp;
   flushOutputContainer(digTemp);
-  printf("hit decoded = %d (digits not filled = %lu)\n", mHitDecoded, mFutureDigits.size());
 }
 
 void Decoder::printCrateInfo(int icru) const

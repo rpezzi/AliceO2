@@ -45,7 +45,7 @@ class TrackReader : public Task
 
   std::vector<o2::tpc::TrackTPC>*mTracksInp = nullptr, mTracksOut;
   std::vector<o2::tpc::TPCClRefElem>*mCluRefVecInp = nullptr, mCluRefVecOut;
-  o2::dataformats::MCTruthContainer<o2::MCCompLabel>*mMCTruthInp = nullptr, mMCTruthOut;
+  std::vector<o2::MCCompLabel>*mMCTruthInp = nullptr, mMCTruthOut;
 
   std::unique_ptr<TFile> mFile;
   std::unique_ptr<TTree> mTree;
@@ -53,10 +53,10 @@ class TrackReader : public Task
   bool mUseMC = true; // use MC truth
 
   std::string mInputFileName = "tpctracks.root";
-  std::string mTrackTreeName = "events";
-  std::string mTrackBranchName = "Tracks";
+  std::string mTrackTreeName = "tpcrec";
+  std::string mTrackBranchName = "TPCTracks";
   std::string mClusRefBranchName = "ClusRefs";
-  std::string mTrackMCTruthBranchName = "TracksMCTruth";
+  std::string mTrackMCTruthBranchName = "TPCTracksMCTruth";
 };
 
 /// create a processor spec

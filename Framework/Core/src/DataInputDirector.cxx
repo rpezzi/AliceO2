@@ -10,16 +10,47 @@
 #include "Framework/DataInputDirector.h"
 #include "Framework/DataDescriptorQueryBuilder.h"
 #include "Framework/Logger.h"
+#include "AnalysisDataModelHelpers.h"
 
 #include "rapidjson/document.h"
 #include "rapidjson/prettywriter.h"
 #include "rapidjson/filereadstream.h"
+
+#include "TGrid.h"
+#include "TObjString.h"
 
 namespace o2
 {
 namespace framework
 {
 using namespace rapidjson;
+
+FileNameHolder* makeFileNameHolder(std::string fileName)
+{
+  auto fileNameHolder = new FileNameHolder();
+  fileNameHolder->fileName = fileName;
+
+  return fileNameHolder;
+}
+
+DataInputDescriptor::DataInputDescriptor(bool alienSupport)
+{
+  mAlienSupport = alienSupport;
+}
+
+void DataInputDescriptor::printOut()
+{
+  LOGP(INFO, "DataInputDescriptor");
+  LOGP(INFO, "  Table name        : {}", tablename);
+  LOGP(INFO, "  Tree name         : {}", treename);
+  LOGP(INFO, "  Input files file  : {}", getInputfilesFilename());
+  LOGP(INFO, "  File name regex   : {}", getFilenamesRegexString());
+  LOGP(INFO, "  Input files       : {}", mfilenames.size());
+  for (auto fn : mfilenames) {
+    LOGP(INFO, "    {} {}", fn->fileName, fn->numberOfTimeFrames);
+  }
+  LOGP(INFO, "  Total number of TF: {}", getNumberTimeFrames());
+}
 
 std::string DataInputDescriptor::getInputfilesFilename()
 {
@@ -36,34 +67,113 @@ std::regex DataInputDescriptor::getFilenamesRegex()
   return std::regex(getFilenamesRegexString());
 }
 
-void DataInputDescriptor::addFilename(std::string fn)
+void DataInputDescriptor::addFileNameHolder(FileNameHolder* fn)
 {
+  // remove leading file:// from file name
+  if (fn->fileName.rfind("file://", 0) == 0) {
+    fn->fileName.erase(0, 7);
+  } else if (!mAlienSupport && fn->fileName.rfind("alien://", 0) == 0) {
+    LOGP(DEBUG, "AliEn file requested. Enabling support.");
+    TGrid::Connect("alien://");
+    mAlienSupport = true;
+  }
+
+  mtotalNumberTimeFrames += fn->numberOfTimeFrames;
   mfilenames.emplace_back(fn);
 }
 
-TFile* DataInputDescriptor::getInputFile(int counter)
+bool DataInputDescriptor::setFile(int counter)
 {
-
-  if (counter < getNumberInputfiles()) {
-    if (mcurrentFile) {
-      if (mcurrentFile->GetName() != mfilenames[counter]) {
-        closeInputFile();
-        mcurrentFile = new TFile(mfilenames[counter].c_str());
-      }
-    } else {
-      mcurrentFile = new TFile(mfilenames[counter].c_str());
-    }
-  } else {
-    closeInputFile();
+  // no files left
+  if (counter >= getNumberInputfiles()) {
+    return false;
   }
 
-  return mcurrentFile;
+  // open file
+  auto filename = mfilenames[counter]->fileName;
+  if (mcurrentFile) {
+    if (mcurrentFile->GetName() != filename) {
+      closeInputFile();
+      mcurrentFile = TFile::Open(filename.c_str());
+    }
+  } else {
+    mcurrentFile = TFile::Open(filename.c_str());
+  }
+  if (!mcurrentFile) {
+    throw std::runtime_error(fmt::format("Couldn't open file \"{}\"!", filename));
+  }
+  mcurrentFile->SetReadaheadSize(50 * 1024 * 1024);
+
+  // get the directory names
+  if (mfilenames[counter]->numberOfTimeFrames <= 0) {
+    std::regex TFRegex = std::regex("TF_[0-9]+");
+    TList* keyList = mcurrentFile->GetListOfKeys();
+
+    // extract TF numbers and sort accordingly
+    for (auto key : *keyList) {
+      if (std::regex_match(((TObjString*)key)->GetString().Data(), TFRegex)) {
+        auto folderNumber = std::stoul(std::string(((TObjString*)key)->GetString().Data()).substr(3));
+        mfilenames[counter]->listOfTimeFrameNumbers.emplace_back(folderNumber);
+      }
+    }
+    std::sort(mfilenames[counter]->listOfTimeFrameNumbers.begin(), mfilenames[counter]->listOfTimeFrameNumbers.end());
+
+    for (auto folderNumber : mfilenames[counter]->listOfTimeFrameNumbers) {
+      auto folderName = "TF_" + std::to_string(folderNumber);
+      mfilenames[counter]->listOfTimeFrameKeys.emplace_back(folderName);
+    }
+    mfilenames[counter]->numberOfTimeFrames = mfilenames[counter]->listOfTimeFrameKeys.size();
+  }
+
+  return true;
+}
+
+uint64_t DataInputDescriptor::getTimeFrameNumber(int counter, int numTF)
+{
+
+  // open file
+  if (!setFile(counter)) {
+    return 0ul;
+  }
+
+  // no TF left
+  if (mfilenames[counter]->numberOfTimeFrames > 0 && numTF >= mfilenames[counter]->numberOfTimeFrames) {
+    return 0ul;
+  }
+
+  return (mfilenames[counter]->listOfTimeFrameNumbers)[numTF];
+}
+
+FileAndFolder DataInputDescriptor::getFileFolder(int counter, int numTF)
+{
+  FileAndFolder fileAndFolder;
+
+  // open file
+  if (!setFile(counter)) {
+    return fileAndFolder;
+  }
+
+  // no TF left
+  if (mfilenames[counter]->numberOfTimeFrames > 0 && numTF >= mfilenames[counter]->numberOfTimeFrames) {
+    return fileAndFolder;
+  }
+
+  fileAndFolder.file = mcurrentFile;
+  fileAndFolder.folderName = (mfilenames[counter]->listOfTimeFrameKeys)[numTF];
+
+  return fileAndFolder;
+}
+
+int DataInputDescriptor::getTimeFramesInFile(int counter)
+{
+  return mfilenames.at(counter)->numberOfTimeFrames;
 }
 
 void DataInputDescriptor::closeInputFile()
 {
   if (mcurrentFile) {
     mcurrentFile->Close();
+    mcurrentFile = nullptr;
     delete mcurrentFile;
   }
 }
@@ -81,9 +191,11 @@ int DataInputDescriptor::fillInputfiles()
     try {
       std::ifstream filelist(fileName);
       while (std::getline(filelist, fileName)) {
-        if (getFilenamesRegexString().empty() ||
-            std::regex_match(fileName, getFilenamesRegex())) {
-          addFilename(fileName);
+        // remove white spaces, empty lines are skipped
+        fileName.erase(std::remove_if(fileName.begin(), fileName.end(), ::isspace), fileName.end());
+        if (!fileName.empty() && (getFilenamesRegexString().empty() ||
+                                  std::regex_match(fileName, getFilenamesRegex()))) {
+          addFileNameHolder(makeFileNameHolder(fileName));
         }
       }
     } catch (...) {
@@ -93,38 +205,16 @@ int DataInputDescriptor::fillInputfiles()
   } else {
     // 3. getFilenamesRegex() @ mdefaultFilenamesPtr
     if (mdefaultFilenamesPtr) {
-      for (auto fileName : *mdefaultFilenamesPtr) {
+      for (auto fileNameHolder : *mdefaultFilenamesPtr) {
         if (getFilenamesRegexString().empty() ||
-            std::regex_match(fileName, getFilenamesRegex())) {
-          addFilename(fileName);
+            std::regex_match(fileNameHolder->fileName, getFilenamesRegex())) {
+          addFileNameHolder(fileNameHolder);
         }
       }
     }
   }
 
   return getNumberInputfiles();
-}
-
-std::string DataInputDescriptor::getInputFilename(int counter)
-{
-  std::string filename("");
-  if (counter >= 0 && counter < getNumberInputfiles()) {
-    filename = mfilenames[counter];
-  }
-
-  return filename;
-}
-
-void DataInputDescriptor::printOut()
-{
-  LOGP(INFO, "DataInputDescriptor");
-  LOGP(INFO, "  Table name        : {}", tablename);
-  LOGP(INFO, "  Tree name         : {}", treename);
-  LOGP(INFO, "  Input files file  : {}", getInputfilesFilename());
-  LOGP(INFO, "  File name regex   : {}", getFilenamesRegexString());
-  LOGP(INFO, "  Input files       : {}", mfilenames.size());
-  for (auto fn : mfilenames)
-    LOGP(INFO, "    {}", fn);
 }
 
 DataInputDirector::DataInputDirector()
@@ -138,7 +228,16 @@ DataInputDirector::DataInputDirector(std::string inputFile)
     inputFile.erase(0, 1);
     setInputfilesFile(inputFile);
   } else {
-    mdefaultInputFiles.emplace_back(inputFile);
+    mdefaultInputFiles.emplace_back(makeFileNameHolder(inputFile));
+  }
+
+  createDefaultDataInputDescriptor();
+}
+
+DataInputDirector::DataInputDirector(std::vector<std::string> inputFiles)
+{
+  for (auto inputFile : inputFiles) {
+    mdefaultInputFiles.emplace_back(makeFileNameHolder(inputFile));
   }
 
   createDefaultDataInputDescriptor();
@@ -156,7 +255,7 @@ void DataInputDirector::createDefaultDataInputDescriptor()
   if (mdefaultDataInputDescriptor) {
     delete mdefaultDataInputDescriptor;
   }
-  mdefaultDataInputDescriptor = new DataInputDescriptor();
+  mdefaultDataInputDescriptor = new DataInputDescriptor(mAlienSupport);
 
   mdefaultDataInputDescriptor->setInputfilesFile(minputfilesFile);
   mdefaultDataInputDescriptor->setFilenamesRegex(mFilenameRegex);
@@ -164,6 +263,8 @@ void DataInputDirector::createDefaultDataInputDescriptor()
   mdefaultDataInputDescriptor->tablename = "any";
   mdefaultDataInputDescriptor->treename = "any";
   mdefaultDataInputDescriptor->fillInputfiles();
+
+  mAlienSupport &= mdefaultDataInputDescriptor->isAlienSupportOn();
 }
 
 bool DataInputDirector::readJson(std::string const& fnjson)
@@ -207,24 +308,24 @@ bool DataInputDirector::readJsonDocument(Document* jsonDoc)
   itemName = "InputDirector";
   const Value& didirItem = (*jsonDoc)[itemName];
   if (!didirItem.IsObject()) {
-    LOGP(ERROR, "Check the JSON document! Couldn't find an \"{}\" object!", itemName);
-    return false;
+    LOGP(INFO, "No \"{}\" object found in the JSON document!", itemName);
+    return true;
   }
 
   // now read various items
   itemName = "debugmode";
   if (didirItem.HasMember(itemName)) {
     if (didirItem[itemName].IsBool()) {
-      mdebugmode = (didirItem[itemName].GetBool());
+      mDebugMode = (didirItem[itemName].GetBool());
     } else {
       LOGP(ERROR, "Check the JSON document! Item \"{}\" must be a boolean!", itemName);
       return false;
     }
   } else {
-    mdebugmode = false;
+    mDebugMode = false;
   }
 
-  if (mdebugmode) {
+  if (mDebugMode) {
     StringBuffer buffer;
     buffer.Clear();
     PrettyWriter<StringBuffer> writer(buffer);
@@ -251,13 +352,13 @@ bool DataInputDirector::readJsonDocument(Document* jsonDoc)
         setInputfilesFile(fileName);
       } else {
         setInputfilesFile("");
-        mdefaultInputFiles.emplace_back(fileName);
+        mdefaultInputFiles.emplace_back(makeFileNameHolder(fileName));
       }
     } else if (didirItem[itemName].IsArray()) {
       setInputfilesFile("");
       auto fns = didirItem[itemName].GetArray();
       for (auto& fn : fns) {
-        mdefaultInputFiles.emplace_back(fn.GetString());
+        mdefaultInputFiles.emplace_back(makeFileNameHolder(fn.GetString()));
       }
     } else {
       LOGP(ERROR, "Check the JSON document! Item \"{}\" must be a string or an array!", itemName);
@@ -279,7 +380,7 @@ bool DataInputDirector::readJsonDocument(Document* jsonDoc)
         return false;
       }
       // create a new dataInputDescriptor
-      auto didesc = new DataInputDescriptor();
+      auto didesc = new DataInputDescriptor(mAlienSupport);
       didesc->setDefaultInputfiles(&mdefaultInputFiles);
 
       itemName = "table";
@@ -334,7 +435,7 @@ bool DataInputDirector::readJsonDocument(Document* jsonDoc)
           } else {
             if (didesc->getFilenamesRegexString().empty() ||
                 std::regex_match(fileName, didesc->getFilenamesRegex())) {
-              didesc->addFilename(fileName);
+              didesc->addFileNameHolder(makeFileNameHolder(fileName));
             }
           }
         } else if (didescItem[itemName].IsArray()) {
@@ -342,7 +443,7 @@ bool DataInputDirector::readJsonDocument(Document* jsonDoc)
           for (auto& fn : fns) {
             if (didesc->getFilenamesRegexString().empty() ||
                 std::regex_match(fn.GetString(), didesc->getFilenamesRegex())) {
-              didesc->addFilename(fn.GetString());
+              didesc->addFileNameHolder(makeFileNameHolder(fn.GetString()));
             }
           }
         } else {
@@ -360,6 +461,7 @@ bool DataInputDirector::readJsonDocument(Document* jsonDoc)
         didesc->printOut();
         LOGP(INFO, "This DataInputDescriptor is ignored because its file list is empty!");
       }
+      mAlienSupport &= didesc->isAlienSupportOn();
     }
   }
 
@@ -373,7 +475,7 @@ bool DataInputDirector::readJsonDocument(Document* jsonDoc)
   }
 
   // print the DataIputDirector
-  if (mdebugmode) {
+  if (mDebugMode) {
     printOut();
   }
 
@@ -397,7 +499,7 @@ DataInputDescriptor* DataInputDirector::getDataInputDescriptor(header::DataHeade
   return result;
 }
 
-std::unique_ptr<TTreeReader> DataInputDirector::getTreeReader(header::DataHeader dh, int counter, std::string treename)
+std::unique_ptr<TTreeReader> DataInputDirector::getTreeReader(header::DataHeader dh, int counter, int numTF, std::string treename)
 {
   std::unique_ptr<TTreeReader> reader = nullptr;
   auto didesc = getDataInputDescriptor(dh);
@@ -405,56 +507,76 @@ std::unique_ptr<TTreeReader> DataInputDirector::getTreeReader(header::DataHeader
   if (!didesc) {
     didesc = mdefaultDataInputDescriptor;
   }
-  auto file = didesc->getInputFile(counter);
-  if (file->IsOpen()) {
-    reader = std::make_unique<TTreeReader>(treename.c_str(), file);
+
+  auto fileAndFolder = didesc->getFileFolder(counter, numTF);
+  if (fileAndFolder.file) {
+    treename = fileAndFolder.folderName + "/" + treename;
+    reader = std::make_unique<TTreeReader>(treename.c_str(), fileAndFolder.file);
     if (!reader) {
-      LOGP(ERROR, "Couldn't create TTreeReader for tree \"{}\" in file \"{}\"", treename, file->GetName());
+      throw std::runtime_error(fmt::format(R"(Couldn't create TTreeReader for tree "{}" in file "{}")", treename, fileAndFolder.file->GetName()));
     }
-  } else {
-    LOGP(ERROR, "Couldn't open file \"{}\"", file->GetName());
   }
 
   return reader;
 }
 
-std::string DataInputDirector::getInputFilename(header::DataHeader dh, int counter)
+FileAndFolder DataInputDirector::getFileFolder(header::DataHeader dh, int counter, int numTF)
 {
   auto didesc = getDataInputDescriptor(dh);
   // if NOT match then use defaultDataInputDescriptor
   if (!didesc) {
     didesc = mdefaultDataInputDescriptor;
   }
-  auto filename = didesc->getInputFilename(counter);
 
-  return filename;
+  return didesc->getFileFolder(counter, numTF);
 }
 
-TTree* DataInputDirector::getDataTree(header::DataHeader dh, int counter)
+int DataInputDirector::getTimeFramesInFile(header::DataHeader dh, int counter)
 {
-  const char* treename;
+  auto didesc = getDataInputDescriptor(dh);
+  // if NOT match then use defaultDataInputDescriptor
+  if (!didesc) {
+    didesc = mdefaultDataInputDescriptor;
+  }
+
+  return didesc->getTimeFramesInFile(counter);
+}
+
+uint64_t DataInputDirector::getTimeFrameNumber(header::DataHeader dh, int counter, int numTF)
+{
+  auto didesc = getDataInputDescriptor(dh);
+  // if NOT match then use defaultDataInputDescriptor
+  if (!didesc) {
+    didesc = mdefaultDataInputDescriptor;
+  }
+
+  return didesc->getTimeFrameNumber(counter, numTF);
+}
+
+TTree* DataInputDirector::getDataTree(header::DataHeader dh, int counter, int numTF)
+{
+  std::string treename;
   TTree* tree = nullptr;
 
   auto didesc = getDataInputDescriptor(dh);
   if (didesc) {
     // if match then use filename and treename from DataInputDescriptor
-    treename = didesc->treename.c_str();
+    treename = didesc->treename;
   } else {
     // if NOT match then use
     //  . filename from defaultDataInputDescriptor
     //  . treename from DataHeader
     didesc = mdefaultDataInputDescriptor;
-    treename = dh.dataDescription.str;
+    treename = aod::datamodel::getTreeName(dh);
   }
-  auto file = didesc->getInputFile(counter);
 
-  if (file->IsOpen()) {
-    tree = (TTree*)file->Get(treename);
+  auto fileAndFolder = didesc->getFileFolder(counter, numTF);
+  if (fileAndFolder.file) {
+    treename = fileAndFolder.folderName + "/" + treename;
+    tree = (TTree*)fileAndFolder.file->Get(treename.c_str());
     if (!tree) {
-      LOGP(ERROR, "Couldn't get TTree \"{}\" from \"{}\"", treename, file->GetName());
+      throw std::runtime_error(fmt::format(R"(Couldn't get TTree "{}" from "{}")", treename, fileAndFolder.file->GetName()));
     }
-  } else {
-    LOGP(ERROR, "Couldn't open file \"{}\"", file->GetName());
   }
 
   return tree;
@@ -495,13 +617,15 @@ void DataInputDirector::printOut()
   LOGP(INFO, "  Default input files file   : {}", minputfilesFile);
   LOGP(INFO, "  Default file name regex    : {}", mFilenameRegex);
   LOGP(INFO, "  Default file names         : {}", mdefaultInputFiles.size());
-  for (auto const& fn : mdefaultInputFiles)
-    LOGP(INFO, "    {}", fn);
+  for (auto const& fn : mdefaultInputFiles) {
+    LOGP(INFO, "    {} {}", fn->fileName, fn->numberOfTimeFrames);
+  }
   LOGP(INFO, "  Default DataInputDescriptor:");
   mdefaultDataInputDescriptor->printOut();
   LOGP(INFO, "  DataInputDescriptors       : {}", getNumberInputDescriptors());
-  for (auto const& didesc : mdataInputDescriptors)
+  for (auto const& didesc : mdataInputDescriptors) {
     didesc->printOut();
+  }
 }
 
 } // namespace framework

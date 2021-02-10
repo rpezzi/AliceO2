@@ -17,11 +17,11 @@
 
 using namespace GPUCA_NAMESPACE::gpu;
 
-GPUProcessor::GPUProcessor() : mRec(nullptr), mGPUProcessorType(PROCESSOR_TYPE_CPU), mDeviceProcessor(nullptr), mConstantMem(nullptr), mAllocateAndInitializeLate(false) {}
+GPUProcessor::GPUProcessor() : mRec(nullptr), mGPUProcessorType(PROCESSOR_TYPE_CPU), mLinkedProcessor(nullptr), mConstantMem(nullptr), mAllocateAndInitializeLate(false) {}
 
 GPUProcessor::~GPUProcessor()
 {
-  if (mRec && mRec->GetDeviceProcessingSettings().memoryAllocationStrategy == GPUMemoryResource::ALLOCATION_INDIVIDUAL) {
+  if (mRec && mRec->GetProcessingSettings().memoryAllocationStrategy == GPUMemoryResource::ALLOCATION_INDIVIDUAL) {
     Clear();
   }
 }
@@ -31,7 +31,8 @@ void GPUProcessor::InitGPUProcessor(GPUReconstruction* rec, GPUProcessor::Proces
   mRec = rec;
   mGPUProcessorType = type;
   if (slaveProcessor) {
-    slaveProcessor->mDeviceProcessor = this;
+    slaveProcessor->mLinkedProcessor = this;
+    mLinkedProcessor = slaveProcessor;
   }
   rec->ConstructGPUProcessor(this);
 }

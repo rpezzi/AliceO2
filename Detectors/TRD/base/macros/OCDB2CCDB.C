@@ -25,7 +25,7 @@
 //    alienv enter VO_ALICE@O2::latest-O2-o2,VO_ALICE@AliRoot::latest-O2-o2
 //    according to my configs, modify as required of course.
 //
-
+#if !defined(__CINT__) || defined(__MAKECINT__)
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -77,12 +77,13 @@
 #include "TRDBase/ChamberNoise.h"
 #include "TRDBase/CalOnlineGainTables.h"
 #include "TRDBase/FeeParam.h"
-#include "TRDBase/TrapConfig.h"
+#include "TRDSimulation/TrapConfig.h"
+#include "DataFormatsTRD/Constants.h"
+#endif
 
 using namespace std;
 using namespace o2::ccdb;
 using namespace o2::trd;
-
 // global variables
 // histograms used for extracting the mean and RMS of calibration parameters
 
@@ -453,38 +454,38 @@ void OCDB2CCDB(Int_t run, const Char_t* storageURI = "alien://folder=/alice/data
 
   /*
 THESE ARE THE ONES NOT CURRENTLY INCLUDED.
-trd_ddchamberStatus        
-trd_gaschromatographXe  
-trd_gasOverpressure  
+trd_ddchamberStatus
+trd_gaschromatographXe
+trd_gasOverpressure
 trd_hvDriftImon
-MonitoringData  
-PIDLQ    
-trd_envTemp              
-trd_gasCO2              
+MonitoringData
+PIDLQ
+trd_envTemp
+trd_gasCO2
 trd_hvDriftUmon
-PIDLQ1D  
-trd_gaschromatographCO2  
-trd_gasH2O              
-trd_hvAnodeImon     
+PIDLQ1D
+trd_gaschromatographCO2
+trd_gasH2O
+trd_hvAnodeImon
 TrkAttach
-PIDNN    
-PHQ      PIDThresholds  
+PIDNN
+PHQ      PIDThresholds
 
 This pulls stuff from DCS I should hopefully not need this stuff for simulation.
-DCS                            
+DCS
 AliTRDSensorArray descends from AliTRDDCSSensorArray
-trd_gaschromatographN2   
-trd_gasO2               
-trd_goofieHv         
-trd_goofiePressure  
+trd_gaschromatographN2
+trd_gasO2
+trd_goofieHv
+trd_goofiePressure
 trd_hvAnodeUmon
-trd_goofieN2        
-trd_goofieTemp      
-trd_goofieCO2        
-trd_goofiePeakArea  
-trd_goofieVelocity  
-trd_goofieGain       
-trd_goofiePeakPos   
+trd_goofieN2
+trd_goofieTemp
+trd_goofieCO2
+trd_goofiePeakArea
+trd_goofieVelocity
+trd_goofieGain
+trd_goofiePeakPos
 */
   return;
 }

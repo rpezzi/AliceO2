@@ -42,6 +42,8 @@ class MCCompLabel;
 namespace dataformats
 {
 template <typename T>
+class ConstMCTruthContainerView;
+template <typename T>
 class MCTruthContainer;
 }
 
@@ -63,11 +65,22 @@ class Clusterer
   using CompClusterExt = o2::itsmft::CompClusterExt;
   using Label = o2::MCCompLabel;
   using MCTruth = o2::dataformats::MCTruthContainer<o2::MCCompLabel>;
+  using ConstMCTruth = o2::dataformats::ConstMCTruthContainerView<o2::MCCompLabel>;
 
  public:
   static constexpr int MaxLabels = 10;
   //=========================================================
   /// methods and transient data used within a thread
+  struct ThreadStat {
+    uint16_t firstChip = 0;
+    uint16_t nChips = 0;
+    uint32_t firstClus = 0;
+    uint32_t firstPatt = 0;
+    uint32_t nClus = 0;
+    uint32_t nPatt = 0;
+    ThreadStat() = default;
+  };
+
   struct ClustererThread {
 
     Clusterer* parent = nullptr; // parent clusterer
@@ -85,12 +98,13 @@ class Clusterer
     uint16_t currCol = 0xffff;                                      ///< Column being processed
     bool noLeftCol = true;                                          ///< flag that there is no column on the left to check
     std::array<Label, MaxLabels> labelsBuff;                        //! temporary buffer for building cluster labels
-    std::array<PixelData, ClusterPattern::MaxPatternBits * 2> pixArrBuff; //! temporary buffer for pattern calc.
+    std::vector<PixelData> pixArrBuff;                              //! temporary buffer for pattern calc.
     //
     /// temporary storage for the thread output
     CompClusCont compClusters;
     PatternCont patterns;
     MCTruth labels;
+    std::vector<ThreadStat> stats; // statistics for each thread results, used at merging
     ///
     ///< reset column buffer, for the performance reasons we use memset
     void resetColumn(int* buff) { std::memset(buff, -1, sizeof(int) * SegmentationAlpide::NRows); }
@@ -118,15 +132,20 @@ class Clusterer
       curr[row] = lastIndex; // store index of the new precluster in the current column buffer
     }
 
-    void fetchMCLabels(int digID, const MCTruth* labelsDig, int& nfilled);
+    void streamCluster(const std::vector<PixelData>& pixbuf, uint16_t rowMin, uint16_t rowSpanW, uint16_t colMin, uint16_t colSpanW,
+                       uint16_t chipID,
+                       CompClusCont* compClusPtr, PatternCont* patternsPtr,
+                       MCTruth* labelsClusPtr, int nlab, bool isHuge = false);
+
+    void fetchMCLabels(int digID, const ConstMCTruth* labelsDig, int& nfilled);
     void initChip(const ChipPixelData* curChipData, uint32_t first);
     void updateChip(const ChipPixelData* curChipData, uint32_t ip);
     void finishChip(ChipPixelData* curChipData, CompClusCont* compClus, PatternCont* patterns,
-                    const MCTruth* labelsDig, MCTruth* labelsClus);
+                    const ConstMCTruth* labelsDig, MCTruth* labelsClus);
     void finishChipSingleHitFast(uint32_t hit, ChipPixelData* curChipData, CompClusCont* compClusPtr,
-                                 PatternCont* patternsPtr, const MCTruth* labelsDigPtr, MCTruth* labelsClusPTr);
-    void process(gsl::span<ChipPixelData*> chipPtrs, CompClusCont* compClusPtr, PatternCont* patternsPtr,
-                 const MCTruth* labelsDigPtr, MCTruth* labelsClPtr, const ROFRecord& rofPtr);
+                                 PatternCont* patternsPtr, const ConstMCTruth* labelsDigPtr, MCTruth* labelsClusPTr);
+    void process(uint16_t chip, uint16_t nChips, CompClusCont* compClusPtr, PatternCont* patternsPtr,
+                 const ConstMCTruth* labelsDigPtr, MCTruth* labelsClPtr, const ROFRecord& rofPtr);
 
     ClustererThread(Clusterer* par = nullptr) : parent(par), curr(column2 + 1), prev(column1 + 1)
     {

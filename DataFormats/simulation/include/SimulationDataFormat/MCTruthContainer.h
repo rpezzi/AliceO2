@@ -30,8 +30,10 @@
 
 namespace o2
 {
+class MCCompLabel;
 namespace dataformats
 {
+
 /// @struct MCTruthHeaderElement
 /// @brief Simple struct having information about truth elements for particular indices:
 /// how many associations we have and where they start in the storage
@@ -138,6 +140,11 @@ class MCTruthContainer
   size_t getIndexedSize() const { return mHeaderArray.size(); }
   // return the number of elements managed in this container
   size_t getNElements() const { return mTruthArray.size(); }
+  // return unterlaying vector of elements
+  const std::vector<TruthElement>& getTruthArray() const
+  {
+    return mTruthArray;
+  }
 
   // get individual "view" container for a given data index
   // the caller can do modifications on this view (such as sorting)
@@ -163,6 +170,16 @@ class MCTruthContainer
   {
     mHeaderArray.clear();
     mTruthArray.clear();
+  }
+
+  // clear and force freeing the memory
+  void clear_andfreememory()
+  {
+    clear();
+    // this forces the desctructor being called on existing buffers
+    mHeaderArray = std::vector<MCTruthHeaderElement>();
+    mTruthArray = std::vector<TruthElement>();
+    mStreamerData = std::vector<char>();
   }
 
   // add element for a particular dataindex
@@ -255,7 +272,7 @@ class MCTruthContainer
       // fix headers
       for (uint32_t i = dataindex + 1; i < mHeaderArray.size(); ++i) {
         auto oldindex = mHeaderArray[i].index;
-        mHeaderArray[i].index = (oldindex != -1) ? oldindex + 1 : oldindex;
+        mHeaderArray[i].index = (oldindex != (uint32_t)-1) ? oldindex + 1 : oldindex;
       }
     }
   }
@@ -310,7 +327,7 @@ class MCTruthContainer
   /// The flattened data starts with a specific header @ref FlatHeader describing
   /// size and content of the two vectors within the raw buffer.
   template <typename ContainerType>
-  size_t flatten_to(ContainerType& container)
+  size_t flatten_to(ContainerType& container) const
   {
     size_t bufferSize = sizeof(FlatHeader) + sizeof(MCTruthHeaderElement) * mHeaderArray.size() + sizeof(TruthElement) * mTruthArray.size();
     container.resize((bufferSize / sizeof(typename ContainerType::value_type)) + ((bufferSize % sizeof(typename ContainerType::value_type)) > 0 ? 1 : 0));
@@ -404,6 +421,8 @@ class MCTruthContainer
 
   ClassDefNV(MCTruthContainer, 2);
 }; // end class
+
+using MCLabelContainer = o2::dataformats::MCTruthContainer<o2::MCCompLabel>;
 
 } // namespace dataformats
 } // namespace o2

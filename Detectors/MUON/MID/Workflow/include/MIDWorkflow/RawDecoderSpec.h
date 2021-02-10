@@ -17,12 +17,17 @@
 #define O2_MID_RAWDECODERSPEC_H
 
 #include "Framework/DataProcessorSpec.h"
+#include "MIDRaw/CrateMasks.h"
+#include "MIDRaw/ElectronicsDelay.h"
+#include "MIDRaw/FEEIdConfig.h"
 
 namespace o2
 {
 namespace mid
 {
-framework::DataProcessorSpec getRawDecoderSpec(bool isBare = false);
+framework::DataProcessorSpec getRawDecoderSpec(bool isDebugMode = false);
+framework::DataProcessorSpec getRawDecoderSpec(bool isDebugMode, const FEEIdConfig& feeIdConfig, const CrateMasks& crateMasks, const ElectronicsDelay& electronicsDelay);
+framework::DataProcessorSpec getRawDecoderSpec(bool isDebugMode, const FEEIdConfig& feeIdConfig, const CrateMasks& crateMasks, const ElectronicsDelay& electronicsDelay, header::DataHeader::SubSpecificationType subSpec);
 } // namespace mid
 } // namespace o2
 

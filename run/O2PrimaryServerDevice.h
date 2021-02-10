@@ -27,6 +27,8 @@
 #include <SimConfig/SimConfig.h>
 #include <CommonUtils/ConfigurableParam.h>
 #include <CommonUtils/RngHelper.h>
+#include "Field/MagneticField.h"
+#include <TGeoGlobalMagField.h>
 #include <typeinfo>
 #include <thread>
 #include <TROOT.h>
@@ -37,14 +39,11 @@ namespace o2
 namespace devices
 {
 
-class O2PrimaryServerDevice : public FairMQDevice
+class O2PrimaryServerDevice final : public FairMQDevice
 {
  public:
   /// Default constructor
-  O2PrimaryServerDevice()
-  {
-    mStack.setExternalMode(true);
-  }
+  O2PrimaryServerDevice() = default;
 
   /// Default destructor
   ~O2PrimaryServerDevice() final
@@ -60,7 +59,12 @@ class O2PrimaryServerDevice : public FairMQDevice
     TStopwatch timer;
     timer.Start();
     auto& conf = o2::conf::SimConfig::Instance();
-    o2::conf::ConfigurableParam::updateFromString(conf.getKeyValueString());
+
+    // init magnetic field as it might be needed by the generator
+    auto field = o2::field::MagneticField::createNominalField(conf.getConfigData().mField);
+    TGeoGlobalMagField::Instance()->SetField(field);
+    TGeoGlobalMagField::Instance()->Lock();
+
     o2::eventgen::GeneratorFactory::setPrimaryGenerator(conf, &mPrimGen);
     mPrimGen.SetEvent(&mEventHeader);
 
@@ -78,8 +82,8 @@ class O2PrimaryServerDevice : public FairMQDevice
   {
     TStopwatch timer;
     timer.Start();
-    mStack.Reset();
-    mPrimGen.GenerateEvent(&mStack);
+    mStack->Reset();
+    mPrimGen.GenerateEvent(mStack);
     timer.Stop();
     LOG(INFO) << "Event generation took " << timer.CpuTime() << "s";
   }
@@ -96,6 +100,14 @@ class O2PrimaryServerDevice : public FairMQDevice
     for (auto& keyvalue : vm) {
       LOG(INFO) << "///// " << keyvalue.first << " " << keyvalue.second.value().type().name();
     }
+    // update the parameters from an INI/JSON file, if given (overrides code-based version)
+    o2::conf::ConfigurableParam::updateFromFile(conf.getConfigFile());
+    // update the parameters from stuff given at command line (overrides file-based version)
+    o2::conf::ConfigurableParam::updateFromString(conf.getKeyValueString());
+
+    mStack = new o2::data::Stack();
+    mStack->setExternalMode(true);
+
     // MC ENGINE
     LOG(INFO) << "ENGINE SET TO " << vm["mcEngine"].as<std::string>();
     // CHUNK SIZE
@@ -194,7 +206,7 @@ class O2PrimaryServerDevice : public FairMQDevice
       counter++;
     }
 
-    auto& prims = mStack.getPrimaries();
+    auto& prims = mStack->getPrimaries();
     auto numberofparts = (int)std::ceil(prims.size() / (1. * mChunkGranularity));
     // number of parts should be at least 1 (even if empty)
     numberofparts = std::max(1, numberofparts);
@@ -266,7 +278,7 @@ class O2PrimaryServerDevice : public FairMQDevice
   std::string mOutChannelName = "";
   o2::eventgen::PrimaryGenerator mPrimGen;
   o2::dataformats::MCEventHeader mEventHeader;
-  o2::data::Stack mStack;      // the stack which is filled
+  o2::data::Stack* mStack = nullptr; // the stack which is filled (pointer since constructor to be called only init method)
   int mChunkGranularity = 500; // how many primaries to send to a worker
   int mLastPosition = 0;       // last position in stack vector
   int mPartCounter = 0;

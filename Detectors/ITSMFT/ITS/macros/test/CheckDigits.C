@@ -15,7 +15,8 @@
 #include "ITSMFTBase/SegmentationAlpide.h"
 #include "ITSMFTSimulation/Hit.h"
 #include "MathUtils/Utils.h"
-#include "SimulationDataFormat/MCTruthContainer.h"
+#include "SimulationDataFormat/ConstMCTruthContainer.h"
+#include "SimulationDataFormat/IOMCTruthContainerView.h"
 #include "SimulationDataFormat/MCCompLabel.h"
 #include "DetectorsBase/GeometryManager.h"
 
@@ -41,7 +42,7 @@ void CheckDigits(std::string digifile = "itsdigits.root", std::string hitfile = 
   // Geometry
   o2::base::GeometryManager::loadGeometry(inputGeom);
   auto* gman = o2::its::GeometryTGeo::Instance();
-  gman->fillMatrixCache(o2::utils::bit2Mask(o2::TransformType::L2G));
+  gman->fillMatrixCache(o2::math_utils::bit2Mask(o2::math_utils::TransformType::L2G));
 
   SegmentationAlpide seg;
 
@@ -60,8 +61,8 @@ void CheckDigits(std::string digifile = "itsdigits.root", std::string hitfile = 
   std::vector<o2::itsmft::Digit>* digArr = nullptr;
   digTree->SetBranchAddress("ITSDigit", &digArr);
 
-  o2::dataformats::MCTruthContainer<o2::MCCompLabel>* labels = nullptr;
-  digTree->SetBranchAddress("ITSDigitMCTruth", &labels);
+  o2::dataformats::IOMCTruthContainerView* plabels = nullptr;
+  digTree->SetBranchAddress("ITSDigitMCTruth", &plabels);
 
   int nevD = digTree->GetEntries(); // digits in cont. readout may be grouped as few events per entry
 
@@ -83,6 +84,9 @@ void CheckDigits(std::string digifile = "itsdigits.root", std::string hitfile = 
   int nROFRec = (int)ROFRecordArrrayRef.size();
   std::vector<int> mcEvMin(nROFRec, hitTree->GetEntries());
   std::vector<int> mcEvMax(nROFRec, -1);
+  o2::dataformats::ConstMCTruthContainer<o2::MCCompLabel> labels;
+  plabels->copyandflatten(labels);
+  delete plabels;
 
   // >> build min and max MC events used by each ROF
   for (int imc = MC2ROFRecordArrrayRef.size(); imc--;) {
@@ -146,10 +150,10 @@ void CheckDigits(std::string digifile = "itsdigits.root", std::string hitfile = 
 
       seg.detectorToLocal(ix, iz, x, z);
 
-      const Point3D<float> locD(x, 0., z);
+      const o2::math_utils::Point3D<float> locD(x, 0., z);
 
       Int_t chipID = (*digArr)[iDigit].getChipIndex();
-      auto lab = (labels->getLabels(iDigit))[0];
+      auto lab = (labels.getLabels(iDigit))[0];
 
       int trID = lab.getTrackID();
 

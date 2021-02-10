@@ -35,6 +35,7 @@
 
 #include "ITSReconstruction/FastMultEstConfig.h"
 #include "ITSReconstruction/FastMultEst.h"
+#include <fmt/format.h>
 
 namespace o2
 {
@@ -43,9 +44,9 @@ namespace its
 {
 using Vertex = o2::dataformats::Vertex<o2::dataformats::TimeStamp<int>>;
 
-TrackerDPL::TrackerDPL(bool isMC, o2::gpu::GPUDataTypes::DeviceType dType) : mIsMC{isMC},
-                                                                             mRecChain{o2::gpu::GPUReconstruction::CreateInstance(dType, true)}
+TrackerDPL::TrackerDPL(bool isMC, const std::string& trModeS, o2::gpu::GPUDataTypes::DeviceType dType) : mIsMC{isMC}, mMode{trModeS}, mRecChain{o2::gpu::GPUReconstruction::CreateInstance(dType, true)}
 {
+  std::transform(mMode.begin(), mMode.end(), mMode.begin(), [](unsigned char c) { return std::tolower(c); });
 }
 
 void TrackerDPL::init(InitContext& ic)
@@ -61,15 +62,54 @@ void TrackerDPL::init(InitContext& ic)
 
     base::GeometryManager::loadGeometry();
     GeometryTGeo* geom = GeometryTGeo::Instance();
-    geom->fillMatrixCache(utils::bit2Mask(TransformType::T2L, TransformType::T2GRot,
-                                          TransformType::T2G));
+    geom->fillMatrixCache(o2::math_utils::bit2Mask(o2::math_utils::TransformType::T2L, o2::math_utils::TransformType::T2GRot,
+                                                   o2::math_utils::TransformType::T2G));
 
     auto* chainITS = mRecChain->AddChain<o2::gpu::GPUChainITS>();
     mRecChain->Init();
     mVertexer = std::make_unique<Vertexer>(chainITS->GetITSVertexerTraits());
     mTracker = std::make_unique<Tracker>(chainITS->GetITSTrackerTraits());
+
+    std::vector<TrackingParameters> trackParams;
+    std::vector<MemoryParameters> memParams;
+
+    if (mMode == "sync") {
+      trackParams.resize(3);
+      memParams.resize(3);
+      trackParams[0].TrackletMaxDeltaPhi = 0.05f;
+      trackParams[1].TrackletMaxDeltaPhi = 0.1f;
+      trackParams[2].MinTrackLength = 4;
+      trackParams[2].TrackletMaxDeltaPhi = 0.3;
+      LOG(INFO) << "Initializing tracker in async. phase reconstruction with " << trackParams.size() << " passes";
+    } else if (mMode == "async") {
+      trackParams.resize(1);
+      memParams.resize(1);
+      LOG(INFO) << "Initializing tracker in sync. phase reconstruction with " << trackParams.size() << " passes";
+    } else if (mMode == "cosmics") {
+      trackParams.resize(1);
+      memParams.resize(1);
+      trackParams[0].MinTrackLength = 3;
+      trackParams[0].TrackletMaxDeltaPhi = o2::its::constants::math::Pi * 0.5f;
+      for (int iLayer = 0; iLayer < o2::its::constants::its2::TrackletsPerRoad; iLayer++) {
+        trackParams[0].TrackletMaxDeltaZ[iLayer] = o2::its::constants::its2::LayersZCoordinate()[iLayer + 1];
+        memParams[0].TrackletsMemoryCoefficients[iLayer] = 0.5f;
+        // trackParams[0].TrackletMaxDeltaZ[iLayer] = 10.f;
+      }
+      for (int iLayer = 0; iLayer < o2::its::constants::its2::CellsPerRoad; iLayer++) {
+        trackParams[0].CellMaxDCA[iLayer] = 10000.f;    //cm
+        trackParams[0].CellMaxDeltaZ[iLayer] = 10000.f; //cm
+        memParams[0].CellsMemoryCoefficients[iLayer] = 0.001f;
+      }
+      LOG(INFO) << "Initializing tracker in reconstruction for cosmics with " << trackParams.size() << " passes";
+    } else {
+      throw std::runtime_error(fmt::format("Unsupported ITS tracking mode {:s} ", mMode));
+    }
+    mTracker->setParameters(memParams, trackParams);
+
     mVertexer->getGlobalConfiguration();
-    // mVertexer->dumpTraits();
+    mTracker->getGlobalConfiguration();
+    LOG(INFO) << Form("%ssing lookup table for material budget approximation", (mTracker->isMatLUT() ? "U" : "Not u"));
+
     double origD[3] = {0., 0., 0.};
     mTracker->setBz(field->getBz(origD));
   } else {
@@ -112,15 +152,15 @@ void TrackerDPL::run(ProcessingContext& pc)
 
   std::vector<o2::its::TrackITSExt> tracks;
   auto& allClusIdx = pc.outputs().make<std::vector<int>>(Output{"ITS", "TRACKCLSID", 0, Lifetime::Timeframe});
-  o2::dataformats::MCTruthContainer<o2::MCCompLabel> trackLabels;
+  std::vector<o2::MCCompLabel> trackLabels;
   auto& allTracks = pc.outputs().make<std::vector<o2::its::TrackITS>>(Output{"ITS", "TRACKS", 0, Lifetime::Timeframe});
-  o2::dataformats::MCTruthContainer<o2::MCCompLabel> allTrackLabels;
+  std::vector<o2::MCCompLabel> allTrackLabels;
 
   auto& vertROFvec = pc.outputs().make<std::vector<o2::itsmft::ROFRecord>>(Output{"ITS", "VERTICESROF", 0, Lifetime::Timeframe});
   auto& vertices = pc.outputs().make<std::vector<Vertex>>(Output{"ITS", "VERTICES", 0, Lifetime::Timeframe});
 
   std::uint32_t roFrame = 0;
-  ROframe event(0);
+  ROframe event(0, 7);
 
   bool continuous = mGRP->isDetContinuousReadOut("ITS");
   LOG(INFO) << "ITSTracker RO: continuous=" << continuous;
@@ -132,10 +172,18 @@ void TrackerDPL::run(ProcessingContext& pc)
   auto copyTracks = [](auto& tracks, auto& allTracks, auto& allClusIdx, int offset = 0) {
     for (auto& trc : tracks) {
       trc.setFirstClusterEntry(allClusIdx.size()); // before adding tracks, create final cluster indices
-      int ncl = trc.getNumberOfClusters();
-      for (int ic = ncl; ic--;) { // track internally keeps in->out cluster indices, but we want to store the references as out->in!!!
-        allClusIdx.push_back(trc.getClusterIndex(ic) + offset);
+      int ncl = trc.getNumberOfClusters(), nclf = 0;
+      uint8_t patt = 0;
+      for (int ic = TrackITSExt::MaxClusters; ic--;) { // track internally keeps in->out cluster indices, but we want to store the references as out->in!!!
+        auto clid = trc.getClusterIndex(ic);
+        if (clid >= 0) {
+          allClusIdx.push_back(clid + offset);
+          nclf++;
+          patt |= 0x1 << ic;
+        }
       }
+      assert(ncl == nclf);
+      trc.setPattern(patt);
       allTracks.emplace_back(trc);
     }
   };
@@ -193,13 +241,13 @@ void TrackerDPL::run(ProcessingContext& pc)
         tracks.swap(mTracker->getTracks());
         LOG(INFO) << "Found tracks: " << tracks.size();
         int number = tracks.size();
-        trackLabels = mTracker->getTrackLabels(); /// FIXME: assignment ctor is not optimal.
-        int shiftIdx = -rof.getFirstEntry();      // cluster entry!!!
+        trackLabels.swap(mTracker->getTrackLabels()); /// FIXME: assignment ctor is not optimal.
+        int shiftIdx = -rof.getFirstEntry();          // cluster entry!!!
         rof.setFirstEntry(first);
         rof.setNEntries(number);
         copyTracks(tracks, allTracks, allClusIdx, shiftIdx);
-        allTrackLabels.mergeAtBack(trackLabels);
-
+        std::copy(trackLabels.begin(), trackLabels.end(), std::back_inserter(allTrackLabels));
+        trackLabels.clear();
         vtxROF.setNEntries(vtxVecLoc.size());
         for (const auto& vtx : vtxVecLoc) {
           vertices.push_back(vtx);
@@ -214,7 +262,7 @@ void TrackerDPL::run(ProcessingContext& pc)
     mTracker->clustersToTracks(event);
     tracks.swap(mTracker->getTracks());
     copyTracks(tracks, allTracks, allClusIdx);
-    allTrackLabels = mTracker->getTrackLabels(); /// FIXME: assignment ctor is not optimal.
+    allTrackLabels.swap(mTracker->getTrackLabels()); /// FIXME: assignment ctor is not optimal.
   }
 
   LOG(INFO) << "ITSTracker pushed " << allTracks.size() << " tracks";
@@ -231,7 +279,7 @@ void TrackerDPL::endOfStream(EndOfStreamContext& ec)
        mTimer.CpuTime(), mTimer.RealTime(), mTimer.Counter() - 1);
 }
 
-DataProcessorSpec getTrackerSpec(bool useMC, o2::gpu::GPUDataTypes::DeviceType dType)
+DataProcessorSpec getTrackerSpec(bool useMC, const std::string& trModeS, o2::gpu::GPUDataTypes::DeviceType dType)
 {
   std::vector<InputSpec> inputs;
   inputs.emplace_back("compClusters", "ITS", "COMPCLUSTERS", 0, Lifetime::Timeframe);
@@ -257,7 +305,7 @@ DataProcessorSpec getTrackerSpec(bool useMC, o2::gpu::GPUDataTypes::DeviceType d
     "its-tracker",
     inputs,
     outputs,
-    AlgorithmSpec{adaptFromTask<TrackerDPL>(useMC, dType)},
+    AlgorithmSpec{adaptFromTask<TrackerDPL>(useMC, trModeS, dType)},
     Options{
       {"grp-file", VariantType::String, "o2sim_grp.root", {"Name of the grp file"}},
       {"its-dictionary-path", VariantType::String, "", {"Path of the cluster-topology dictionary file"}}}};

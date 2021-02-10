@@ -302,10 +302,12 @@ class RawPixelReader : public PixelReader
     auto& pixels = chipData.getData();
     std::sort(pixels.begin(), pixels.end(),
               [](auto lhs, auto rhs) {
-                if (lhs.getRow() < rhs.getRow())
+                if (lhs.getRow() < rhs.getRow()) {
                   return true;
-                if (lhs.getRow() > rhs.getRow())
+                }
+                if (lhs.getRow() > rhs.getRow()) {
                   return false;
+                }
                 return lhs.getCol() < rhs.getCol();
               });
     ruData.cableData[chip.cableHWPos].ensureFreeCapacity(40 * (2 + pixels.size())); // make sure buffer has enough capacity
@@ -371,7 +373,7 @@ class RawPixelReader : public PixelReader
       link->data.ensureFreeCapacity(MaxGBTPacketBytes);
       link->data.addFast(reinterpret_cast<uint8_t*>(&rdh), RDHUtils::getHeaderSize(rdh)); // write RDH for current packet
       link->nTriggers++;                                                    // acknowledge the page, note: here we count pages, not triggers
-      o2::itsmft::GBTDataHeader gbtHeader(0, link->lanes);
+      o2::itsmft::GBTDataHeaderL gbtHeader(0, link->lanes);
       o2::itsmft::GBTDataTrailer gbtTrailer; // lanes will be set on closing the last page
 
       gbtHeader.packetIdx = RDHUtils::getPageCounter(rdh);
@@ -780,7 +782,7 @@ class RawPixelReader : public PixelReader
       mDecodingStat.nPagesProcessed++;
       raw += RDHUtils::getHeaderSize(rdh);
       int nGBTWords = (RDHUtils::getMemorySize(rdh) - RDHUtils::getHeaderSize(rdh)) / mGBTWordSize - 2; // number of GBT words excluding header/trailer
-      auto gbtH = reinterpret_cast<const o2::itsmft::GBTDataHeader*>(raw);    // process GBT header
+      auto gbtH = reinterpret_cast<const o2::itsmft::GBTDataHeaderL*>(raw);                             // process GBT header
 
 #ifdef _RAW_READER_ERROR_CHECKS_
       if (mVerbose) {
@@ -1049,7 +1051,7 @@ class RawPixelReader : public PixelReader
       raw += RDHUtils::getHeaderSize(rdh);
       // number of 128 b GBT words excluding header/trailer
       int nGBTWords = (RDHUtils::getMemorySize(rdh) - RDHUtils::getHeaderSize(rdh)) / o2::itsmft::GBTPaddedWordLength - 2;
-      auto gbtH = reinterpret_cast<const o2::itsmft::GBTDataHeader*>(raw); // process GBT header
+      auto gbtH = reinterpret_cast<const o2::itsmft::GBTDataHeaderL*>(raw); // process GBT header
 
 #ifdef _RAW_READER_ERROR_CHECKS_
       if (mVerbose) {
@@ -1254,8 +1256,12 @@ class RawPixelReader : public PixelReader
         RDHUtils::printRDH(reinterpret_cast<const o2::header::RAWDataHeader*>(getGBTLink(decData.links[decData.cableLinkID[icab]])->lastRDH));
       }
 #endif
-
-      while ((res = mCoder.decodeChip(*chipData, cableData))) { // we register only chips with hits or errors flags set
+      auto cabHW = decData.cableHWID[icab];
+      auto ri = decData.ruInfo;
+      auto chIdGetter = [this, cabHW, ri](int cid) {
+        return this->mMAP.getGlobalChipID(cid, cabHW, *ri);
+      };
+      while ((res = mCoder.decodeChip(*chipData, cableData, chIdGetter))) { // we register only chips with hits or errors flags set
         if (res > 0) {
 #ifdef _RAW_READER_ERROR_CHECKS_
           // for the IB staves check if the cable ID is the same as the chip ID on the module
@@ -1269,7 +1275,7 @@ class RawPixelReader : public PixelReader
           }
 #endif
           // convert HW chip id within the module to absolute chip id
-          chipData->setChipID(mMAP.getGlobalChipID(chipData->getChipID(), decData.cableHWID[icab], *decData.ruInfo));
+          // chipData->setChipID(mMAP.getGlobalChipID(chipData->getChipID(), decData.cableHWID[icab], *decData.ruInfo));
           chipData->setInteractionRecord(mInteractionRecord);
           chipData->setTrigger(mTrigger);
           mDecodingStat.nNonEmptyChips++;

@@ -11,14 +11,12 @@
 o2_add_library(MFTTracking
                TARGETVARNAME targetName
                SOURCES src/Tracker.cxx
-                 src/TrackParamMFT.cxx
 	               src/ROframe.cxx
 	               src/Cluster.cxx
 	               src/IOUtils.cxx
-                 src/TrackFitter.cxx
-                 src/FitterTrackMFT.cxx
-                 src/TrackExtrap.cxx
-                 src/MFTTrackingParam.cxx
+                       src/TrackFitter.cxx
+                       src/MFTTrackingParam.cxx
+		       src/TrackerConfig.cxx
                PUBLIC_LINK_LIBRARIES O2::CommonConstants
                                      O2::DataFormatsITSMFT
                                      O2::SimulationDataFormat
@@ -29,8 +27,6 @@ o2_add_library(MFTTracking
 o2_target_root_dictionary(MFTTracking
                           HEADERS include/MFTTracking/TrackCA.h
                           HEADERS include/MFTTracking/TrackFitter.h
-                          HEADERS include/MFTTracking/TrackExtrap.h
-                          HEADERS include/MFTTracking/FitterTrackMFT.h
-                          HEADERS include/MFTTracking/TrackParamMFT.h
                           HEADERS include/MFTTracking/MFTTrackingParam.h
+			  HEADERS include/MFTTracking/TrackerConfig.h
                           LINKDEF src/MFTTrackingLinkDef.h)

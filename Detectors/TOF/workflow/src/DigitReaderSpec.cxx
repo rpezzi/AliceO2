@@ -16,7 +16,8 @@
 
 #include "Framework/ControlService.h"
 #include "Framework/ConfigParamRegistry.h"
-#include "TOFWorkflow/DigitReaderSpec.h"
+#include "Framework/Logger.h"
+#include "TOFWorkflowUtils/DigitReaderSpec.h"
 #include "DataFormatsParameters/GRPObject.h"
 
 using namespace o2::framework;
@@ -51,31 +52,38 @@ void DigitReader::run(ProcessingContext& pc)
   if (treeDig) {
     treeDig->SetBranchAddress("TOFDigit", &mPdigits);
     treeDig->SetBranchAddress("TOFReadoutWindow", &mProw);
+    treeDig->SetBranchAddress("TOFPatterns", &mPpatterns);
 
     if (mUseMC) {
       treeDig->SetBranchAddress("TOFDigitMCTruth", &mPlabels);
     }
 
-    treeDig->GetEntry(0);
+    treeDig->GetEntry(mCurrentEntry);
 
     // add digits loaded in the output snapshot
     pc.outputs().snapshot(Output{o2::header::gDataOriginTOF, "DIGITS", 0, Lifetime::Timeframe}, mDigits);
     pc.outputs().snapshot(Output{o2::header::gDataOriginTOF, "READOUTWINDOW", 0, Lifetime::Timeframe}, mRow);
-    if (mUseMC)
+    pc.outputs().snapshot(Output{o2::header::gDataOriginTOF, "PATTERNS", 0, Lifetime::Timeframe}, mPatterns);
+    if (mUseMC) {
       pc.outputs().snapshot(Output{o2::header::gDataOriginTOF, "DIGITSMCTR", 0, Lifetime::Timeframe}, mLabels);
+    }
 
     static o2::parameters::GRPObject::ROMode roMode = o2::parameters::GRPObject::CONTINUOUS;
 
-    LOG(INFO) << "TOF: Sending ROMode= " << roMode << " to GRPUpdater";
+    LOG(DEBUG) << "TOF: Sending ROMode= " << roMode << " to GRPUpdater";
     pc.outputs().snapshot(Output{o2::header::gDataOriginTOF, "ROMode", 0, Lifetime::Timeframe}, roMode);
   } else {
     LOG(ERROR) << "Cannot read the TOF digits !";
     return;
   }
 
-  mState = 2;
-  //pc.services().get<ControlService>().readyToQuit(QuitRequest::Me);
-  pc.services().get<ControlService>().endOfStream();
+  mCurrentEntry++;
+
+  if (mCurrentEntry >= treeDig->GetEntries()) {
+    mState = 2;
+    //pc.services().get<ControlService>().readyToQuit(QuitRequest::Me);
+    pc.services().get<ControlService>().endOfStream();
+  }
 }
 
 DataProcessorSpec getDigitReaderSpec(bool useMC)
@@ -86,6 +94,7 @@ DataProcessorSpec getDigitReaderSpec(bool useMC)
   if (useMC) {
     outputs.emplace_back(o2::header::gDataOriginTOF, "DIGITSMCTR", 0, Lifetime::Timeframe);
   }
+  outputs.emplace_back(o2::header::gDataOriginTOF, "PATTERNS", 0, Lifetime::Timeframe);
   outputs.emplace_back(o2::header::gDataOriginTOF, "ROMode", 0, Lifetime::Timeframe);
 
   return DataProcessorSpec{

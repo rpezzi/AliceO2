@@ -14,6 +14,7 @@
 #include "PropertyTreeHelpers.h"
 
 #include <boost/program_options.hpp>
+#include <boost/program_options/options_description.hpp>
 
 #include <string>
 #include <vector>
@@ -28,10 +29,10 @@ namespace o2::framework
 
 BoostOptionsRetriever::BoostOptionsRetriever(bool ignoreUnknown,
                                              int argc, char** argv)
-  : mDescription{"ALICE O2 Framework - Available options"},
-    mIgnoreUnknown{ignoreUnknown},
+  : mDescription{std::make_unique<boost::program_options::options_description>("ALICE O2 Framework - Available options")},
     mArgc{argc},
-    mArgv{argv}
+    mArgv{argv},
+    mIgnoreUnknown{ignoreUnknown}
 {
 }
 
@@ -39,8 +40,8 @@ void BoostOptionsRetriever::update(std::vector<ConfigParamSpec> const& specs,
                                    boost::property_tree::ptree& store,
                                    boost::property_tree::ptree& provenance)
 {
-  auto options = mDescription.add_options();
-  for (auto& spec : specs) {
+  auto options = mDescription->add_options();
+  for (const auto& spec : specs) {
     const char* name = spec.name.c_str();
     const char* help = spec.help.c_str();
     // FIXME: propagate default value?
@@ -63,14 +64,30 @@ void BoostOptionsRetriever::update(std::vector<ConfigParamSpec> const& specs,
       case VariantType::Bool:
         options = options(name, bpo::value<bool>()->zero_tokens()->default_value(spec.defaultValue.get<bool>()), help);
         break;
+      case VariantType::ArrayInt:
+      case VariantType::ArrayFloat:
+      case VariantType::ArrayDouble:
+      case VariantType::ArrayBool:
+      case VariantType::ArrayString:
+      case VariantType::Array2DInt:
+      case VariantType::Array2DFloat:
+      case VariantType::Array2DDouble:
+        options = options(name, bpo::value<std::string>()->default_value(spec.defaultValue.asString()), help);
+        break;
+      case VariantType::LabeledArrayInt:
+      case VariantType::LabeledArrayFloat:
+      case VariantType::LabeledArrayDouble:
       case VariantType::Unknown:
       case VariantType::Empty:
         break;
     };
   }
 
-  auto parsed = mIgnoreUnknown ? bpo::command_line_parser(mArgc, mArgv).options(mDescription).allow_unregistered().run()
-                               : bpo::parse_command_line(mArgc, mArgv, mDescription);
+  using namespace bpo::command_line_style;
+  auto style = (allow_short | short_allow_adjacent | short_allow_next | allow_long | long_allow_adjacent | long_allow_next | allow_sticky | allow_dash_for_short);
+
+  auto parsed = mIgnoreUnknown ? bpo::command_line_parser(mArgc, mArgv).options(*mDescription).style(style).allow_unregistered().run()
+                               : bpo::parse_command_line(mArgc, mArgv, *mDescription, style);
   bpo::variables_map vmap;
   bpo::store(parsed, vmap);
   PropertyTreeHelpers::populate(specs, store, vmap, provenance);

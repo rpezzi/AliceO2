@@ -16,12 +16,21 @@
 #include "Generators/Generator.h"
 #include <fstream>
 
+#ifdef GENERATORS_WITH_HEPMC3_DEPRECATED
 namespace HepMC
 {
 class Reader;
 class GenEvent;
 class FourVector;
 } // namespace HepMC
+#else
+namespace HepMC3
+{
+class Reader;
+class GenEvent;
+class FourVector;
+} // namespace HepMC3
+#endif
 
 namespace o2
 {
@@ -45,6 +54,10 @@ class GeneratorHepMC : public Generator
   /** Initialize the generator if needed **/
   Bool_t Init() override;
 
+  /** methods to override **/
+  Bool_t generateEvent() override;
+  Bool_t importParticles() override;
+
   /** setters **/
   void setVersion(Int_t val) { mVersion = val; };
   void setFileName(std::string val) { mFileName = val; };
@@ -55,19 +68,24 @@ class GeneratorHepMC : public Generator
   /** operator= **/
   GeneratorHepMC& operator=(const GeneratorHepMC&);
 
-  /** methods to override **/
-  Bool_t generateEvent() override;
-  Bool_t importParticles() override;
-
   /** methods **/
+#ifdef GENERATORS_WITH_HEPMC3_DEPRECATED
   const HepMC::FourVector getBoostedVector(const HepMC::FourVector& vector, Double_t boost);
+#else
+  const HepMC3::FourVector getBoostedVector(const HepMC3::FourVector& vector, Double_t boost);
+#endif
 
   /** HepMC interface **/
   std::ifstream mStream; //!
   std::string mFileName;
   Int_t mVersion;
+#ifdef GENERATORS_WITH_HEPMC3_DEPRECATED
   HepMC::Reader* mReader;  //!
   HepMC::GenEvent* mEvent; //!
+#else
+  HepMC3::Reader* mReader;  //!
+  HepMC3::GenEvent* mEvent; //!
+#endif
 
   ClassDefOverride(GeneratorHepMC, 1);
 

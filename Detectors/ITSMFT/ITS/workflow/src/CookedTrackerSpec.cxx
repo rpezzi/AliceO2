@@ -63,8 +63,8 @@ void CookedTrackerDPL::init(InitContext& ic)
 
     o2::base::GeometryManager::loadGeometry();
     o2::its::GeometryTGeo* geom = o2::its::GeometryTGeo::Instance();
-    geom->fillMatrixCache(o2::utils::bit2Mask(o2::TransformType::T2L, o2::TransformType::T2GRot,
-                                              o2::TransformType::T2G));
+    geom->fillMatrixCache(o2::math_utils::bit2Mask(o2::math_utils::TransformType::T2L, o2::math_utils::TransformType::T2GRot,
+                                                   o2::math_utils::TransformType::T2G));
     mTracker.setGeometry(geom);
 
     double origD[3] = {0., 0., 0.};
@@ -112,14 +112,14 @@ void CookedTrackerDPL::run(ProcessingContext& pc)
 
   LOG(INFO) << "ITSCookedTracker pulled " << compClusters.size() << " clusters, in " << rofs.size() << " RO frames";
 
-  o2::dataformats::MCTruthContainer<o2::MCCompLabel> trackLabels;
+  std::vector<o2::MCCompLabel> trackLabels;
   if (mUseMC) {
     mTracker.setMCTruthContainers(labels.get(), &trackLabels);
   }
 
   o2::its::VertexerTraits vertexerTraits;
   o2::its::Vertexer vertexer(&vertexerTraits);
-  o2::its::ROframe event(0);
+  o2::its::ROframe event(0, 7);
 
   auto& vertROFvec = pc.outputs().make<std::vector<o2::itsmft::ROFRecord>>(Output{"ITS", "VERTICESROF", 0, Lifetime::Timeframe});
   auto& vertices = pc.outputs().make<std::vector<Vertex>>(Output{"ITS", "VERTICES", 0, Lifetime::Timeframe});

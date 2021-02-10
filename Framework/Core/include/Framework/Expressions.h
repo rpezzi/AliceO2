@@ -14,6 +14,12 @@
 #include "Framework/CompilerBuiltins.h"
 #include "Framework/Pack.h"
 #include "Framework/CheckTypes.h"
+#include "Framework/Configurable.h"
+#include "Framework/Variant.h"
+#include "Framework/InitContext.h"
+#include "Framework/ConfigParamRegistry.h"
+#include "Framework/RootConfigParamHelpers.h"
+#include "Framework/RuntimeError.h"
 #include <arrow/type_fwd.h>
 #include <gandiva/gandiva_aliases.h>
 #include <arrow/type.h>
@@ -24,7 +30,6 @@
 #include <gandiva/node.h>
 #include <gandiva/filter.h>
 #include <gandiva/projector.h>
-#include <fmt/format.h>
 #else
 namespace gandiva
 {
@@ -51,7 +56,7 @@ struct LiteralStorage {
   using stored_pack = framework::pack<T...>;
 };
 
-using LiteralValue = LiteralStorage<int, bool, float, double>;
+using LiteralValue = LiteralStorage<int, bool, float, double, uint8_t, int64_t>;
 
 template <typename T>
 constexpr auto selectArrowType()
@@ -68,6 +73,8 @@ constexpr auto selectArrowType()
     return atype::INT8;
   } else if constexpr (std::is_same_v<T, uint16_t>) {
     return atype::INT16;
+  } else if constexpr (std::is_same_v<T, int64_t>) {
+    return atype::INT64;
   } else if constexpr (std::is_same_v<T, uint8_t>) {
     return atype::UINT8;
   } else {
@@ -85,6 +92,7 @@ struct LiteralNode {
   LiteralNode(T v) : value{v}, type{selectArrowType<T>()}
   {
   }
+
   using var_t = LiteralValue::stored_type;
   var_t value;
   atype::type type = atype::NA;
@@ -105,9 +113,36 @@ struct OpNode {
   BasicOp op;
 };
 
+/// A placeholder node for simple type configurable
+struct PlaceholderNode : LiteralNode {
+  template <typename T>
+  PlaceholderNode(Configurable<T> v) : LiteralNode{v.value}
+  {
+    if constexpr (variant_trait_v<typename std::decay<T>::type> != VariantType::Unknown) {
+      retrieve = [name = v.name](InitContext& context) { return LiteralNode::var_t{context.options().get<T>(name.c_str())}; };
+    } else {
+      retrieve = [name = v.name](InitContext& context) {
+        auto pt = context.options().get<boost::property_tree::ptree>(name.c_str());
+        return LiteralNode::var_t{RootConfigParamHelpers::as<T>(pt)};
+      };
+    }
+  }
+
+  void reset(InitContext& context)
+  {
+    value = retrieve(context);
+  }
+
+  std::function<LiteralNode::var_t(InitContext&)> retrieve;
+};
+
 /// A generic tree node
 struct Node {
   Node(LiteralNode v) : self{v}, left{nullptr}, right{nullptr}
+  {
+  }
+
+  Node(PlaceholderNode v) : self{v}, left{nullptr}, right{nullptr}
   {
   }
 
@@ -130,7 +165,7 @@ struct Node {
       right{nullptr} {}
 
   /// variant with possible nodes
-  using self_t = std::variant<LiteralNode, BindingNode, OpNode>;
+  using self_t = std::variant<LiteralNode, BindingNode, OpNode, PlaceholderNode>;
   self_t self;
   /// pointers to children
   std::unique_ptr<Node> left;
@@ -174,6 +209,42 @@ template <typename T>
 inline Node operator!=(Node left, T rightValue)
 {
   return Node{OpNode{BasicOp::NotEqual}, std::move(left), LiteralNode{rightValue}};
+}
+
+template <typename T>
+inline Node operator>(Node left, Configurable<T> rightValue)
+{
+  return Node{OpNode{BasicOp::GreaterThan}, std::move(left), PlaceholderNode{rightValue}};
+}
+
+template <typename T>
+inline Node operator<(Node left, Configurable<T> rightValue)
+{
+  return Node{OpNode{BasicOp::LessThan}, std::move(left), PlaceholderNode{rightValue}};
+}
+
+template <typename T>
+inline Node operator>=(Node left, Configurable<T> rightValue)
+{
+  return Node{OpNode{BasicOp::GreaterThanOrEqual}, std::move(left), PlaceholderNode{rightValue}};
+}
+
+template <typename T>
+inline Node operator<=(Node left, Configurable<T> rightValue)
+{
+  return Node{OpNode{BasicOp::LessThanOrEqual}, std::move(left), PlaceholderNode{rightValue}};
+}
+
+template <typename T>
+inline Node operator==(Node left, Configurable<T> rightValue)
+{
+  return Node{OpNode{BasicOp::Equal}, std::move(left), PlaceholderNode{rightValue}};
+}
+
+template <typename T>
+inline Node operator!=(Node left, Configurable<T> rightValue)
+{
+  return Node{OpNode{BasicOp::NotEqual}, std::move(left), PlaceholderNode{rightValue}};
 }
 
 /// node comparisons
@@ -249,6 +320,11 @@ inline Node operator/(Node left, BindingNode right)
   return Node{OpNode{BasicOp::Division}, std::move(left), right};
 }
 
+inline Node operator/(BindingNode left, BindingNode right)
+{
+  return Node{OpNode{BasicOp::Division}, left, right};
+}
+
 inline Node operator+(Node left, Node right)
 {
   return Node{OpNode{BasicOp::Addition}, std::move(left), std::move(right)};
@@ -301,6 +377,18 @@ inline Node operator+(T left, Node right)
   return Node{OpNode{BasicOp::Addition}, LiteralNode{left}, std::move(right)};
 }
 
+template <>
+inline Node operator+(Node left, BindingNode right)
+{
+  return Node{OpNode{BasicOp::Addition}, std::move(left), right};
+}
+
+template <>
+inline Node operator+(BindingNode left, Node right)
+{
+  return Node{OpNode{BasicOp::Addition}, left, std::move(right)};
+}
+
 template <typename T>
 inline Node operator-(Node left, T right)
 {
@@ -312,6 +400,54 @@ inline Node operator-(T left, Node right)
 {
   return Node{OpNode{BasicOp::Subtraction}, LiteralNode{left}, std::move(right)};
 }
+
+template <typename T>
+inline Node operator*(Node left, Configurable<T> right)
+{
+  return Node{OpNode{BasicOp::Multiplication}, std::move(left), PlaceholderNode{right}};
+}
+
+template <typename T>
+inline Node operator*(Configurable<T> left, Node right)
+{
+  return Node{OpNode{BasicOp::Multiplication}, PlaceholderNode{left}, std::move(right)};
+}
+
+template <typename T>
+inline Node operator/(Node left, Configurable<T> right)
+{
+  return Node{OpNode{BasicOp::Division}, std::move(left), PlaceholderNode{right}};
+}
+
+template <typename T>
+inline Node operator/(Configurable<T> left, Node right)
+{
+  return Node{OpNode{BasicOp::Division}, PlaceholderNode{left}, std::move(right)};
+}
+
+template <typename T>
+inline Node operator+(Node left, Configurable<T> right)
+{
+  return Node{OpNode{BasicOp::Addition}, std::move(left), PlaceholderNode{right}};
+}
+
+template <typename T>
+inline Node operator+(Configurable<T> left, Node right)
+{
+  return Node{OpNode{BasicOp::Addition}, PlaceholderNode{left}, std::move(right)};
+}
+
+template <typename T>
+inline Node operator-(Node left, Configurable<T> right)
+{
+  return Node{OpNode{BasicOp::Subtraction}, std::move(left), PlaceholderNode{right}};
+}
+
+template <typename T>
+inline Node operator-(Configurable<T> left, Node right)
+{
+  return Node{OpNode{BasicOp::Subtraction}, PlaceholderNode{left}, std::move(right)};
+}
 /// semi-binary
 template <typename T>
 inline Node npow(Node left, T right)
@@ -320,6 +456,11 @@ inline Node npow(Node left, T right)
 }
 
 /// unary operations on nodes
+inline Node nsqrt(Node left)
+{
+  return Node{OpNode{BasicOp::Sqrt}, std::move(left)};
+}
+
 inline Node nexp(Node left)
 {
   return Node{OpNode{BasicOp::Exp}, std::move(left)};
@@ -338,6 +479,36 @@ inline Node nlog10(Node left)
 inline Node nabs(Node left)
 {
   return Node{OpNode{BasicOp::Abs}, std::move(left)};
+}
+
+inline Node nsin(Node left)
+{
+  return Node{OpNode{BasicOp::Sin}, std::move(left)};
+}
+
+inline Node ncos(Node left)
+{
+  return Node{OpNode{BasicOp::Cos}, std::move(left)};
+}
+
+inline Node ntan(Node left)
+{
+  return Node{OpNode{BasicOp::Tan}, std::move(left)};
+}
+
+inline Node nasin(Node left)
+{
+  return Node{OpNode{BasicOp::Asin}, std::move(left)};
+}
+
+inline Node nacos(Node left)
+{
+  return Node{OpNode{BasicOp::Acos}, std::move(left)};
+}
+
+inline Node natan(Node left)
+{
+  return Node{OpNode{BasicOp::Atan}, std::move(left)};
 }
 
 /// A struct, containing the root of the expression tree
@@ -386,6 +557,27 @@ void updateExpressionInfos(expressions::Filter const& filter, std::vector<Expres
 gandiva::ConditionPtr makeCondition(gandiva::NodePtr node);
 /// Function to create gandiva projecting expression from generic gandiva expression tree
 gandiva::ExpressionPtr makeExpression(gandiva::NodePtr node, gandiva::FieldPtr result);
+/// Update placeholder nodes from context
+void updatePlaceholders(Filter& filter, InitContext& context);
+
+template <typename... C>
+std::shared_ptr<gandiva::Projector> createProjectors(framework::pack<C...>, gandiva::SchemaPtr schema)
+{
+  std::shared_ptr<gandiva::Projector> projector;
+  auto s = gandiva::Projector::Make(
+    schema,
+    {makeExpression(
+      framework::expressions::createExpressionTree(
+        framework::expressions::createOperations(C::Projector()),
+        schema),
+      C::asArrowField())...},
+    &projector);
+  if (s.ok()) {
+    return projector;
+  } else {
+    throw o2::framework::runtime_error_f("Failed to create projector: %s", s.ToString().c_str());
+  }
+}
 } // namespace o2::framework::expressions
 
 #endif // O2_FRAMEWORK_EXPRESSIONS_H_

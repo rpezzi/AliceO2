@@ -9,26 +9,27 @@
 # submit itself to any jurisdiction.
 
 o2_add_library(AnalysisCore
-               SOURCES  src/StepTHn.cxx
-                        src/CorrelationContainer.cxx
+               SOURCES  src/CorrelationContainer.cxx
                         src/TrackSelection.cxx
-                        src/VarManager.cxx
-                        src/HistogramManager.cxx
-                        src/RunToTimestamp.cxx
+                        src/TriggerAliases.cxx
+                        src/HFConfigurables.cxx
                PUBLIC_LINK_LIBRARIES O2::Framework O2::AnalysisDataModel)
 
 o2_target_root_dictionary(AnalysisCore
-              HEADERS include/Analysis/StepTHn.h
-                      include/Analysis/CorrelationContainer.h
-                      include/Analysis/TrackSelection.h
-                      include/Analysis/VarManager.h
-                      include/Analysis/HistogramManager.h
-                      include/Analysis/RunToTimestamp.h
-                      include/Analysis/MC.h
+              HEADERS include/AnalysisCore/CorrelationContainer.h
+                      include/AnalysisCore/TrackSelection.h
+                      include/AnalysisCore/TrackSelectionDefaults.h
+                      include/AnalysisCore/TriggerAliases.h
+                      include/AnalysisCore/MC.h
+                      include/AnalysisCore/HFConfigurables.h
               LINKDEF src/AnalysisCoreLinkDef.h)
 
-o2_add_executable(makerun2timestamp
-            COMPONENT_NAME AnalysisCore
-            SOURCES src/InsertNewRunToTimestamp.cxx
-            PUBLIC_LINK_LIBRARIES O2::AnalysisCore O2::CCDB)
+if(FastJet_FOUND)
+o2_add_library(AnalysisJets
+               SOURCES  src/JetFinder.cxx
+               PUBLIC_LINK_LIBRARIES O2::AnalysisCore FastJet::FastJet FastJet::Contrib)
 
+o2_target_root_dictionary(AnalysisJets
+              HEADERS include/AnalysisCore/JetFinder.h
+              LINKDEF src/AnalysisJetsLinkDef.h)
+endif()

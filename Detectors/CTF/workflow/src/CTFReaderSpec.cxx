@@ -25,6 +25,14 @@
 #include "DetectorsCommonDataFormats/CTFHeader.h"
 #include "DataFormatsITSMFT/CTF.h"
 #include "DataFormatsTPC/CTF.h"
+#include "DataFormatsFT0/CTF.h"
+#include "DataFormatsFV0/CTF.h"
+#include "DataFormatsFDD/CTF.h"
+#include "DataFormatsTOF/CTF.h"
+#include "DataFormatsMID/CTF.h"
+#include "DataFormatsEMCAL/CTF.h"
+#include "DataFormatsPHOS/CTF.h"
+#include "DataFormatsCPV/CTF.h"
 #include "Algorithm/RangeTokenizer.h"
 
 using namespace o2::framework;
@@ -94,6 +102,7 @@ void CTFReaderSpec::run(ProcessingContext& pc)
       throw std::runtime_error(o2::utils::concat_string("failed to find output message header for ", label));
     }
     hd->firstTForbit = ctfHeader.firstTForbit;
+    hd->tfCounter = mTFCounter;
   };
 
   // send CTF Header
@@ -124,6 +133,62 @@ void CTFReaderSpec::run(ProcessingContext& pc)
     setFirstTFOrbit(det.getName());
   }
 
+  det = DetID::FT0;
+  if (detsTF[det]) {
+    auto& bufVec = pc.outputs().make<std::vector<o2::ctf::BufferType>>({det.getName()}, sizeof(o2::ft0::CTF));
+    o2::ft0::CTF::readFromTree(bufVec, *(tree.get()), det.getName());
+    setFirstTFOrbit(det.getName());
+  }
+
+  det = DetID::FV0;
+  if (detsTF[det]) {
+    auto& bufVec = pc.outputs().make<std::vector<o2::ctf::BufferType>>({det.getName()}, sizeof(o2::fv0::CTF));
+    o2::fv0::CTF::readFromTree(bufVec, *(tree.get()), det.getName());
+    setFirstTFOrbit(det.getName());
+  }
+
+  det = DetID::FDD;
+  if (detsTF[det]) {
+    auto& bufVec = pc.outputs().make<std::vector<o2::ctf::BufferType>>({det.getName()}, sizeof(o2::fdd::CTF));
+    o2::fdd::CTF::readFromTree(bufVec, *(tree.get()), det.getName());
+    setFirstTFOrbit(det.getName());
+  }
+
+  det = DetID::TOF;
+  if (detsTF[det]) {
+    auto& bufVec = pc.outputs().make<std::vector<o2::ctf::BufferType>>({det.getName()}, sizeof(o2::tof::CTF));
+    o2::tof::CTF::readFromTree(bufVec, *(tree.get()), det.getName());
+    setFirstTFOrbit(det.getName());
+  }
+
+  det = DetID::MID;
+  if (detsTF[det]) {
+    auto& bufVec = pc.outputs().make<std::vector<o2::ctf::BufferType>>({det.getName()}, sizeof(o2::mid::CTF));
+    o2::mid::CTF::readFromTree(bufVec, *(tree.get()), det.getName());
+    setFirstTFOrbit(det.getName());
+  }
+
+  det = DetID::EMC;
+  if (detsTF[det]) {
+    auto& bufVec = pc.outputs().make<std::vector<o2::ctf::BufferType>>({det.getName()}, sizeof(o2::emcal::CTF));
+    o2::emcal::CTF::readFromTree(bufVec, *(tree.get()), det.getName());
+    setFirstTFOrbit(det.getName());
+  }
+
+  det = DetID::PHS;
+  if (detsTF[det]) {
+    auto& bufVec = pc.outputs().make<std::vector<o2::ctf::BufferType>>({det.getName()}, sizeof(o2::phos::CTF));
+    o2::phos::CTF::readFromTree(bufVec, *(tree.get()), det.getName());
+    setFirstTFOrbit(det.getName());
+  }
+
+  det = DetID::CPV;
+  if (detsTF[det]) {
+    auto& bufVec = pc.outputs().make<std::vector<o2::ctf::BufferType>>({det.getName()}, sizeof(o2::cpv::CTF));
+    o2::cpv::CTF::readFromTree(bufVec, *(tree.get()), det.getName());
+    setFirstTFOrbit(det.getName());
+  }
+
   mTimer.Stop();
   LOG(INFO) << "Read CTF " << inputFile << " in " << mTimer.CpuTime() - cput << " s";
 
@@ -133,6 +198,7 @@ void CTFReaderSpec::run(ProcessingContext& pc)
     LOGF(INFO, "CTF reading total timing: Cpu: %.3e Real: %.3e s in %d slots",
          mTimer.CpuTime(), mTimer.RealTime(), mTimer.Counter() - 1);
   }
+  mTFCounter++;
 }
 
 ///_______________________________________

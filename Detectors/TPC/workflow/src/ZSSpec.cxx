@@ -44,6 +44,7 @@
 #include "DPLUtils/DPLRawParser.h"
 #include "DataFormatsParameters/GRPObject.h"
 #include "DetectorsCommonDataFormats/NameConf.h"
+#include "DataFormatsTPC/WorkflowHelper.h"
 
 using namespace o2::framework;
 using namespace o2::header;
@@ -65,7 +66,6 @@ DataProcessorSpec getZSEncoderSpec(std::vector<int> const& inputIds, bool zs10bi
   struct ProcessAttributes {
     std::unique_ptr<unsigned long long int[]> zsoutput;
     std::vector<unsigned int> sizes;
-    std::unique_ptr<o2::gpu::GPUReconstructionConvert> zsEncoder;
     std::vector<int> inputIds;
     bool verify = false;
     int verbosity = 1;
@@ -74,7 +74,6 @@ DataProcessorSpec getZSEncoderSpec(std::vector<int> const& inputIds, bool zs10bi
 
   auto initFunction = [inputIds, zs10bit, threshold, outRaw](InitContext& ic) {
     auto processAttributes = std::make_shared<ProcessAttributes>();
-    auto& zsEncoder = processAttributes->zsEncoder;
     auto& zsoutput = processAttributes->zsoutput;
     processAttributes->inputIds = inputIds;
     auto& verify = processAttributes->verify;
@@ -87,48 +86,24 @@ DataProcessorSpec getZSEncoderSpec(std::vector<int> const& inputIds, bool zs10bi
         return;
       }
 
-      auto& zsEncoder = processAttributes->zsEncoder;
       auto& zsoutput = processAttributes->zsoutput;
       auto& verify = processAttributes->verify;
       auto& sizes = processAttributes->sizes;
       auto& verbosity = processAttributes->verbosity;
 
       std::array<gsl::span<const o2::tpc::Digit>, NSectors> inputDigits;
-      GPUTrackingInOutDigits inDigitsGPU;
 
       GPUParam _GPUParam;
-      _GPUParam.SetDefaults(5.00668);
-      const GPUParam mGPUParam = _GPUParam;
+      GPUO2InterfaceConfiguration config;
+      config.configEvent.solenoidBz = 5.00668;
+      config.ReadConfigurableParam();
+      _GPUParam.SetDefaults(&config.configEvent, &config.configReconstruction, &config.configProcessing, nullptr);
 
-      int operation = 0;
-      std::vector<InputSpec> filter = {{"check", ConcreteDataTypeMatcher{gDataOriginTPC, "DIGITS"}, Lifetime::Timeframe}};
-      for (auto const& ref : InputRecordWalker(pc.inputs(), filter)) {
-        auto const* sectorHeader = DataRefUtils::getHeader<o2::tpc::TPCSectorHeader*>(ref);
-        if (sectorHeader == nullptr) {
-          // FIXME: think about error policy
-          LOG(ERROR) << "sector header missing on header stack";
-          return;
-        }
-        const int& sector = sectorHeader->sector();
-        // the TPCSectorHeader now allows to transport information for more than one sector,
-        // e.g. for transporting clusters in one single data block. Digits are however grouped
-        // on sector level
-        if (sectorHeader->sector() >= TPCSectorHeader::NSectors) {
-          throw std::runtime_error("Expecting data for single sectors");
-        }
-
-        inputDigits[sector] = pc.inputs().get<gsl::span<o2::tpc::Digit>>(ref);
-        LOG(INFO) << "GOT SPAN FOR SECTOR " << sector << " -> "
-                  << inputDigits[sector].size();
-      }
-      for (int i = 0; i < NSectors; i++) {
-        inDigitsGPU.tpcDigits[i] = inputDigits[i].data();
-        inDigitsGPU.nTPCDigits[i] = inputDigits[i].size();
-      }
+      const auto& inputs = getWorkflowTPCInput(pc, 0, false, false, 0xFFFFFFFFF, true);
       sizes.resize(NSectors * NEndpoints);
       bool zs12bit = !zs10bit;
       o2::InteractionRecord ir = o2::raw::HBFUtils::Instance().getFirstIR();
-      zsEncoder->RunZSEncoder<o2::tpc::Digit, DigitArray>(inputDigits, &zsoutput, sizes.data(), nullptr, &ir, mGPUParam, zs12bit, verify, threshold);
+      o2::gpu::GPUReconstructionConvert::RunZSEncoder<o2::tpc::Digit, DigitArray>(inputs->inputDigits, &zsoutput, sizes.data(), nullptr, &ir, _GPUParam, zs12bit, verify, threshold);
       ZeroSuppressedContainer8kb* page = reinterpret_cast<ZeroSuppressedContainer8kb*>(zsoutput.get());
       unsigned int offset = 0;
       for (unsigned int i = 0; i < NSectors; i++) {
@@ -179,7 +154,7 @@ DataProcessorSpec getZSEncoderSpec(std::vector<int> const& inputIds, bool zs10bi
         if (useGrouping != LinksGrouping::Link) {
           writer.useCaching();
         }
-        zsEncoder->RunZSEncoder<o2::tpc::Digit>(inputDigits, nullptr, nullptr, &writer, &ir, mGPUParam, zs12bit, false, threshold);
+        o2::gpu::GPUReconstructionConvert::RunZSEncoder<o2::tpc::Digit>(inputDigits, nullptr, nullptr, &writer, &ir, _GPUParam, zs12bit, false, threshold);
         writer.writeConfFile("TPC", "RAWDATA", fmt::format("{}tpcraw.cfg", outDir));
       }
       zsoutput.reset(nullptr);
@@ -242,10 +217,12 @@ DataProcessorSpec getZStoDigitsSpec(std::vector<int> const& inputIds)
       // sort digits
       for (auto& digits : outDigits) {
         std::sort(digits.begin(), digits.end(), [](const auto& a, const auto& b) {
-          if (a.getTimeStamp() < b.getTimeStamp())
+          if (a.getTimeStamp() < b.getTimeStamp()) {
             return true;
-          if ((a.getTimeStamp() == b.getTimeStamp()) && (a.getRow() < b.getRow()))
+          }
+          if ((a.getTimeStamp() == b.getTimeStamp()) && (a.getRow() < b.getRow())) {
             return true;
+          }
           return false;
         });
       }

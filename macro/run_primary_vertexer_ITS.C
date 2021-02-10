@@ -73,8 +73,8 @@ int run_primary_vertexer_ITS(const GPUDataTypes::DeviceType dtype = GPUDataTypes
 
   o2::base::GeometryManager::loadGeometry(path);
   o2::its::GeometryTGeo* geom = o2::its::GeometryTGeo::Instance();
-  geom->fillMatrixCache(o2::utils::bit2Mask(o2::TransformType::T2L, o2::TransformType::T2GRot,
-                                            o2::TransformType::L2G)); // request cached transforms
+  geom->fillMatrixCache(o2::math_utils::bit2Mask(o2::math_utils::TransformType::T2L, o2::math_utils::TransformType::T2GRot,
+                                                 o2::math_utils::TransformType::L2G)); // request cached transforms
 
   // Get event header
   TChain mcHeaderTree("o2sim");
@@ -170,7 +170,7 @@ int run_primary_vertexer_ITS(const GPUDataTypes::DeviceType dtype = GPUDataTypes
 
   for (size_t iROfCount{static_cast<size_t>(startAt)}; iROfCount < static_cast<size_t>(stopAt); ++iROfCount) {
     auto& rof = (*rofs)[iROfCount];
-    o2::its::ROframe frame(iROfCount); // to get meaningful roframeId
+    o2::its::ROframe frame(iROfCount, 7); // to get meaningful roframeId
     std::cout << "ROframe: " << iROfCount << std::endl;
 
     auto it = pattIt;

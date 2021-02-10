@@ -17,9 +17,7 @@
 #include "clusterFinderDefs.h"
 #include "GPUCommonMath.h"
 
-namespace GPUCA_NAMESPACE
-{
-namespace gpu
+namespace GPUCA_NAMESPACE::gpu
 {
 
 struct CfFragment {
@@ -74,6 +72,21 @@ struct CfFragment {
     return (hasBacklog ? t < OverlapTimebins : false) || (hasFuture ? t >= (length - OverlapTimebins) : false);
   }
 
+  GPUdi() tpccf::TPCFragmentTime lengthWithoutOverlap() const
+  {
+    return length - (hasBacklog ? OverlapTimebins : 0) - (hasFuture ? OverlapTimebins : 0);
+  }
+
+  GPUdi() tpccf::TPCFragmentTime firstNonOverlapTimeBin() const
+  {
+    return (hasBacklog ? OverlapTimebins : 0);
+  }
+
+  GPUdi() tpccf::TPCFragmentTime lastNonOverlapTimeBin() const
+  {
+    return length - (hasFuture ? OverlapTimebins : 0);
+  }
+
   GPUdi() tpccf::TPCFragmentTime toLocal(tpccf::TPCTime t) const
   {
     return t - first();
@@ -98,7 +111,6 @@ struct CfFragment {
   }
 };
 
-} // namespace gpu
-} // namespace GPUCA_NAMESPACE
+} // namespace GPUCA_NAMESPACE::gpu
 
 #endif

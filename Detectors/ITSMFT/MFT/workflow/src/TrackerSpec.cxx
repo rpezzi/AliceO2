@@ -12,6 +12,7 @@
 
 #include "MFTWorkflow/TrackerSpec.h"
 
+#include "MFTTracking/TrackerConfig.h"
 #include "MFTTracking/ROframe.h"
 #include "MFTTracking/IOUtils.h"
 #include "MFTTracking/Tracker.h"
@@ -43,6 +44,8 @@ namespace mft
 
 void TrackerDPL::init(InitContext& ic)
 {
+  mTimer.Stop();
+  mTimer.Reset();
   auto filename = ic.options().get<std::string>("grp-file");
   const auto grp = o2::parameters::GRPObject::loadFrom(filename.c_str());
   if (grp) {
@@ -52,18 +55,23 @@ void TrackerDPL::init(InitContext& ic)
 
     o2::base::GeometryManager::loadGeometry();
     o2::mft::GeometryTGeo* geom = o2::mft::GeometryTGeo::Instance();
-    geom->fillMatrixCache(o2::utils::bit2Mask(o2::TransformType::T2L, o2::TransformType::T2GRot,
-                                              o2::TransformType::T2G));
+    geom->fillMatrixCache(o2::math_utils::bit2Mask(o2::math_utils::TransformType::T2L, o2::math_utils::TransformType::T2GRot,
+                                                   o2::math_utils::TransformType::T2G));
 
+    // tracking configuration parameters
+    auto& mftTrackingParam = MFTTrackingParam::Instance();
+    // create the tracker: set the B-field, the configuration and initialize
     mTracker = std::make_unique<o2::mft::Tracker>(mUseMC);
-    double origD[3] = {0., 0., 0.};
-    mTracker->setBz(field->getBz(origD));
+    double centerMFT[3] = {0, 0, -61.4}; // Field at center of MFT
+    mTracker->setBz(field->getBz(centerMFT));
+    mTracker->initConfig(mftTrackingParam);
+    mTracker->initialize();
   } else {
     throw std::runtime_error(o2::utils::concat_string("Cannot retrieve GRP from the ", filename));
   }
 
-  std::string dictPath = ic.options().get<std::string>("its-dictionary-path");
-  std::string dictFile = o2::base::NameConf::getDictionaryFileName(o2::detectors::DetID::ITS, dictPath, ".bin");
+  std::string dictPath = ic.options().get<std::string>("mft-dictionary-path");
+  std::string dictFile = o2::base::NameConf::getDictionaryFileName(o2::detectors::DetID::MFT, dictPath, ".bin");
   if (o2::base::NameConf::pathExists(dictFile)) {
     mDict.readBinaryFile(dictFile);
     LOG(INFO) << "Tracker running with a provided dictionary: " << dictFile;
@@ -74,8 +82,11 @@ void TrackerDPL::init(InitContext& ic)
 
 void TrackerDPL::run(ProcessingContext& pc)
 {
+  mTimer.Start(false);
   gsl::span<const unsigned char> patterns = pc.inputs().get<gsl::span<unsigned char>>("patterns");
   auto compClusters = pc.inputs().get<const std::vector<o2::itsmft::CompClusterExt>>("compClusters");
+  auto nTracksLTF = 0;
+  auto nTracksCA = 0;
 
   // code further down does assignment to the rofs and the altered object is used for output
   // we therefore need a copy of the vector rather than an object created directly on the input data,
@@ -97,14 +108,12 @@ void TrackerDPL::run(ProcessingContext& pc)
   }
 
   //std::vector<o2::mft::TrackMFTExt> tracks;
-  std::vector<int> allClusIdx;
+  auto& allClusIdx = pc.outputs().make<std::vector<int>>(Output{"MFT", "TRACKCLSID", 0, Lifetime::Timeframe});
   o2::dataformats::MCTruthContainer<o2::MCCompLabel> trackLabels;
-  std::vector<o2::mft::TrackMFT> allTracks;
   o2::dataformats::MCTruthContainer<o2::MCCompLabel> allTrackLabels;
   std::vector<o2::mft::TrackLTF> tracksLTF;
-  auto& allTracksLTF = pc.outputs().make<std::vector<o2::mft::TrackLTF>>(Output{"MFT", "TRACKSLTF", 0, Lifetime::Timeframe});
   std::vector<o2::mft::TrackCA> tracksCA;
-  auto& allTracksCA = pc.outputs().make<std::vector<o2::mft::TrackCA>>(Output{"MFT", "TRACKSCA", 0, Lifetime::Timeframe});
+  auto& allTracksMFT = pc.outputs().make<std::vector<o2::mft::TrackMFT>>(Output{"MFT", "TRACKS", 0, Lifetime::Timeframe});
 
   std::uint32_t roFrame = 0;
   o2::mft::ROframe event(0);
@@ -113,12 +122,13 @@ void TrackerDPL::run(ProcessingContext& pc)
   LOG(INFO) << "MFTTracker RO: continuous=" << continuous;
 
   // snippet to convert found tracks to final output tracks with separate cluster indices
-  auto copyTracks = [](auto& tracks, auto& allTracks, auto& allClusIdx, int offset = 0) {
+  auto copyTracks = [&event](auto& tracks, auto& allTracks, auto& allClusIdx) {
     for (auto& trc : tracks) {
-      trc.setFirstClusterEntry(allClusIdx.size()); // before adding tracks, create final cluster indices
-      int ncl = trc.getNumberOfClusters();
+      trc.setExternalClusterIndexOffset(allClusIdx.size());
+      int ncl = trc.getNumberOfPoints();
       for (int ic = 0; ic < ncl; ic++) {
-        allClusIdx.push_back(trc.getClusterIndex(ic) + offset);
+        auto externalClusterID = trc.getExternalClusterIndex(ic);
+        allClusIdx.push_back(externalClusterID);
       }
       allTracks.emplace_back(trc);
     }
@@ -126,37 +136,54 @@ void TrackerDPL::run(ProcessingContext& pc)
 
   gsl::span<const unsigned char>::iterator pattIt = patterns.begin();
   if (continuous) {
-    for (const auto& rof : rofs) {
-      int nclUsed = ioutils::loadROFrameData(rof, event, compClusters, pattIt, mDict, labels);
+    for (auto& rof : rofs) {
+      int nclUsed = ioutils::loadROFrameData(rof, event, compClusters, pattIt, mDict, labels, mTracker.get());
       if (nclUsed) {
         event.setROFrameId(roFrame);
-        event.initialise();
+        event.initialize();
         LOG(INFO) << "ROframe: " << roFrame << ", clusters loaded : " << nclUsed;
         mTracker->setROFrame(roFrame);
         mTracker->clustersToTracks(event);
         tracksLTF.swap(event.getTracksLTF());
         tracksCA.swap(event.getTracksCA());
+        nTracksLTF += tracksLTF.size();
+        nTracksCA += tracksCA.size();
+
+        if (mUseMC) {
+          mTracker->computeTracksMClabels(tracksLTF);
+          mTracker->computeTracksMClabels(tracksCA);
+          trackLabels = mTracker->getTrackLabels(); /// FIXME: assignment ctor is not optimal.
+          allTrackLabels.mergeAtBack(trackLabels);
+        }
+
         LOG(INFO) << "Found tracks LTF: " << tracksLTF.size();
         LOG(INFO) << "Found tracks CA: " << tracksCA.size();
-        trackLabels = mTracker->getTrackLabels(); /// FIXME: assignment ctor is not optimal.
-        int first = allTracks.size();
-        int shiftIdx = -rof.getFirstEntry();
-        rofs[roFrame].setFirstEntry(first);
-        std::copy(tracksLTF.begin(), tracksLTF.end(), std::back_inserter(allTracksLTF));
-        std::copy(tracksCA.begin(), tracksCA.end(), std::back_inserter(allTracksCA));
-        allTrackLabels.mergeAtBack(trackLabels);
+        int first = allTracksMFT.size();
+        int number = tracksLTF.size() + tracksCA.size();
+        rof.setFirstEntry(first);
+        rof.setNEntries(number);
+        copyTracks(tracksLTF, allTracksMFT, allClusIdx);
+        copyTracks(tracksCA, allTracksMFT, allClusIdx);
       }
       roFrame++;
     }
   }
 
-  //LOG(INFO) << "MFTTracker pushed " << allTracks.size() << " tracks";
-  LOG(INFO) << "MFTTracker pushed " << allTracksLTF.size() << " tracks LTF";
-  LOG(INFO) << "MFTTracker pushed " << allTracksCA.size() << " tracks CA";
+  LOG(INFO) << "MFTTracker found " << nTracksLTF << " tracks LTF";
+  LOG(INFO) << "MFTTracker found " << nTracksCA << " tracks CA";
+  LOG(INFO) << "MFTTracker pushed " << allTracksMFT.size() << " tracks";
+
   if (mUseMC) {
     pc.outputs().snapshot(Output{"MFT", "TRACKSMCTR", 0, Lifetime::Timeframe}, allTrackLabels);
     pc.outputs().snapshot(Output{"MFT", "TRACKSMC2ROF", 0, Lifetime::Timeframe}, mc2rofs);
   }
+  mTimer.Stop();
+}
+
+void TrackerDPL::endOfStream(EndOfStreamContext& ec)
+{
+  LOGF(INFO, "MFT Tracker total timing: Cpu: %.3e Real: %.3e s in %d slots",
+       mTimer.CpuTime(), mTimer.RealTime(), mTimer.Counter() - 1);
 }
 
 DataProcessorSpec getTrackerSpec(bool useMC)
@@ -167,9 +194,9 @@ DataProcessorSpec getTrackerSpec(bool useMC)
   inputs.emplace_back("ROframes", "MFT", "CLUSTERSROF", 0, Lifetime::Timeframe);
 
   std::vector<OutputSpec> outputs;
-  outputs.emplace_back("MFT", "TRACKSLTF", 0, Lifetime::Timeframe);
-  outputs.emplace_back("MFT", "TRACKSCA", 0, Lifetime::Timeframe);
+  outputs.emplace_back("MFT", "TRACKS", 0, Lifetime::Timeframe);
   outputs.emplace_back("MFT", "TRACKSROF", 0, Lifetime::Timeframe);
+  outputs.emplace_back("MFT", "TRACKCLSID", 0, Lifetime::Timeframe);
 
   if (useMC) {
     inputs.emplace_back("labels", "MFT", "CLUSTERSMCTR", 0, Lifetime::Timeframe);
@@ -185,7 +212,7 @@ DataProcessorSpec getTrackerSpec(bool useMC)
     AlgorithmSpec{adaptFromTask<TrackerDPL>(useMC)},
     Options{
       {"grp-file", VariantType::String, "o2sim_grp.root", {"Name of the output file"}},
-      {"its-dictionary-path", VariantType::String, "", {"Path of the cluster-topology dictionary file"}}}};
+      {"mft-dictionary-path", VariantType::String, "", {"Path of the cluster-topology dictionary file"}}}};
 }
 
 } // namespace mft

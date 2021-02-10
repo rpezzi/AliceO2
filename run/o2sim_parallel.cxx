@@ -36,9 +36,29 @@
 #include "rapidjson/filereadstream.h"
 #include "rapidjson/filewritestream.h"
 
-static const char* serverlogname = "serverlog";
-static const char* workerlogname = "workerlog";
-static const char* mergerlogname = "mergerlog";
+std::string getServerLogName()
+{
+  auto& conf = o2::conf::SimConfig::Instance();
+  std::stringstream str;
+  str << conf.getOutPrefix() << "_serverlog";
+  return str.str();
+}
+
+std::string getWorkerLogName()
+{
+  auto& conf = o2::conf::SimConfig::Instance();
+  std::stringstream str;
+  str << conf.getOutPrefix() << "_workerlog";
+  return str.str();
+}
+
+std::string getMergerLogName()
+{
+  auto& conf = o2::conf::SimConfig::Instance();
+  std::stringstream str;
+  str << conf.getOutPrefix() << "_mergerlog";
+  return str.str();
+}
 
 void cleanup()
 {
@@ -49,21 +69,21 @@ void cleanup()
   if (getenv("ALICE_O2SIM_DUMPLOG")) {
     std::cerr << "------------- START OF EVENTSERVER LOG ----------" << std::endl;
     std::stringstream catcommand1;
-    catcommand1 << "cat " << serverlogname << ";";
+    catcommand1 << "cat " << getServerLogName() << ";";
     if (system(catcommand1.str().c_str()) != 0) {
       LOG(WARN) << "error executing system call";
     }
 
     std::cerr << "------------- START OF SIM WORKER(S) LOG --------" << std::endl;
     std::stringstream catcommand2;
-    catcommand2 << "cat " << workerlogname << "*;";
+    catcommand2 << "cat " << getWorkerLogName() << "*;";
     if (system(catcommand2.str().c_str()) != 0) {
       LOG(WARN) << "error executing system call";
     }
 
     std::cerr << "------------- START OF MERGER LOG ---------------" << std::endl;
     std::stringstream catcommand3;
-    catcommand3 << "cat " << mergerlogname << ";";
+    catcommand3 << "cat " << getMergerLogName() << ";";
     if (system(catcommand3.str().c_str()) != 0) {
       LOG(WARN) << "error executing system call";
     }
@@ -80,6 +100,10 @@ int checkresult()
   // easy check: see if we have number of entries in output tree == number of events asked
   std::string filename = o2::base::NameConf::getMCKinematicsFileName(conf.getOutPrefix().c_str());
   TFile f(filename.c_str(), "OPEN");
+  if (f.IsZombie()) {
+    LOG(WARN) << "Kinematics file corrupted or does not exist";
+    return 1;
+  }
   auto tr = static_cast<TTree*>(f.Get("o2sim"));
   if (!tr) {
     errors++;
@@ -94,12 +118,18 @@ int checkresult()
   return errors;
 }
 
+std::vector<int> gChildProcesses; // global vector of child pids
+
 // signal handler for graceful exit
 void sighandler(int signal)
 {
   if (signal == SIGINT || signal == SIGTERM) {
-    LOG(INFO) << "signal caught ... clean up and exit";
+    LOG(INFO) << "o2-sim driver: Signal caught ... clean up and exit";
     cleanup();
+    // forward signal to all children
+    for (auto& pid : gChildProcesses) {
+      kill(pid, signal);
+    }
     exit(0);
   }
 }
@@ -281,7 +311,7 @@ int main(int argc, char* argv[])
   // the server
   int pid = fork();
   if (pid == 0) {
-    int fd = open(serverlogname, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+    int fd = open(getServerLogName().c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
     setenv("ALICE_O2SIMSERVERTODRIVER_PIPE", std::to_string(pipe_serverdriver_fd[1]).c_str(), 1);
 
     dup2(fd, 1); // make stdout go to file
@@ -322,9 +352,9 @@ int main(int argc, char* argv[])
     }
     return r;
   } else {
-    childpids.push_back(pid);
+    gChildProcesses.push_back(pid);
     close(pipe_serverdriver_fd[1]);
-    std::cout << "Spawning particle server on PID " << pid << "; Redirect output to " << serverlogname << "\n";
+    std::cout << "Spawning particle server on PID " << pid << "; Redirect output to " << getServerLogName() << "\n";
     launchThreadMonitoringEvents(pipe_serverdriver_fd[0], "DISTRIBUTING EVENT : ");
   }
 
@@ -336,7 +366,7 @@ int main(int argc, char* argv[])
   for (int id = 0; id < nworkers; ++id) {
     // the workers
     std::stringstream workerlogss;
-    workerlogss << workerlogname << id;
+    workerlogss << getWorkerLogName() << id;
 
     // the workers
     std::stringstream workerss;
@@ -356,7 +386,7 @@ int main(int argc, char* argv[])
             "worker", "--mq-config", localconfig.c_str(), "--severity", "info", (char*)nullptr);
       return 0;
     } else {
-      childpids.push_back(pid);
+      gChildProcesses.push_back(pid);
       std::cout << "Spawning sim worker " << id << " on PID " << pid
                 << "; Redirect output to " << workerlogss.str() << "\n";
     }
@@ -370,7 +400,7 @@ int main(int argc, char* argv[])
 
   pid = fork();
   if (pid == 0) {
-    int fd = open(mergerlogname, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+    int fd = open(getMergerLogName().c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
     dup2(fd, 1); // make stdout go to file
     dup2(fd, 2); // make stderr go to file - you may choose to not do this
                  // or perhaps send stderr to another file
@@ -384,14 +414,14 @@ int main(int argc, char* argv[])
           (char*)nullptr);
     return 0;
   } else {
-    std::cout << "Spawning hit merger on PID " << pid << "; Redirect output to " << mergerlogname << "\n";
-    childpids.push_back(pid);
+    std::cout << "Spawning hit merger on PID " << pid << "; Redirect output to " << getMergerLogName() << "\n";
+    gChildProcesses.push_back(pid);
     close(pipe_mergerdriver_fd[1]);
     launchThreadMonitoringEvents(pipe_mergerdriver_fd[0], "EVENT FINISHED : ");
   }
 
   // wait on merger (which when exiting completes the workflow)
-  auto mergerpid = childpids.back();
+  auto mergerpid = gChildProcesses.back();
 
   int status, cpid;
   // wait just blocks and waits until any child returns; but we make sure to wait until merger is here
@@ -402,8 +432,8 @@ int main(int argc, char* argv[])
     }
     // we bring down all processes if one of them aborts
     if (WTERMSIG(status) == SIGABRT) {
-      for (auto p : childpids) {
-        kill(p, SIGABRT);
+      for (auto p : gChildProcesses) {
+        kill(p, SIGTERM);
       }
       cleanup();
       LOG(FATAL) << "ABORTING DUE TO ABORT IN COMPONENT";
@@ -414,7 +444,7 @@ int main(int argc, char* argv[])
   LOG(INFO) << "Simulation process took " << timer.RealTime() << " s";
 
   // make sure the rest shuts down
-  for (auto p : childpids) {
+  for (auto p : gChildProcesses) {
     if (p != mergerpid) {
       LOG(DEBUG) << "SHUTTING DOWN CHILD PROCESS " << p;
       kill(p, SIGTERM);

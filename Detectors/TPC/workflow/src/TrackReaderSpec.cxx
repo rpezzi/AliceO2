@@ -29,7 +29,7 @@ TrackReader::TrackReader(bool useMC)
 
 void TrackReader::init(InitContext& ic)
 {
-  mInputFileName = ic.options().get<std::string>("tpc-tracks-infile");
+  mInputFileName = ic.options().get<std::string>("infile");
   connectTree(mInputFileName);
 }
 
@@ -60,7 +60,7 @@ void TrackReader::accumulate(int from, int n)
     mTracksOut.swap(*mTracksInp);
     mCluRefVecOut.swap(*mCluRefVecInp);
     if (mUseMC) {
-      mMCTruthOut.mergeAtBack(*mMCTruthInp);
+      std::copy(mMCTruthInp->begin(), mMCTruthInp->end(), std::back_inserter(mMCTruthOut));
     }
   } else {
     for (int iev = 0; iev < n; iev++) {
@@ -83,7 +83,7 @@ void TrackReader::accumulate(int from, int n)
       std::copy(tr0, tr1, std::back_inserter(mTracksOut));
       // MC
       if (mUseMC) {
-        mMCTruthOut.mergeAtBack(*mMCTruthInp);
+        std::copy(mMCTruthInp->begin(), mMCTruthInp->end(), std::back_inserter(mMCTruthOut));
       }
     }
   }
@@ -131,7 +131,7 @@ DataProcessorSpec getTPCTrackReaderSpec(bool useMC)
     outputSpec,
     AlgorithmSpec{adaptFromTask<TrackReader>(useMC)},
     Options{
-      {"tpc-tracks-infile", VariantType::String, "tpctracks.root", {"Name of the input track file"}}}};
+      {"infile", VariantType::String, "tpctracks.root", {"Name of the input track file"}}}};
 }
 
 } // namespace tpc

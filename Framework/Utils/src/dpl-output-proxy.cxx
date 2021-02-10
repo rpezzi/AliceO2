@@ -30,6 +30,14 @@ void customize(std::vector<ConfigParamSpec>& workflowOptions)
 
   workflowOptions.push_back(
     ConfigParamSpec{
+      "output-proxy-method", VariantType::String, "bind", {"proxy socket method: bind, connect"}});
+
+  workflowOptions.push_back(
+    ConfigParamSpec{
+      "output-proxy-address", VariantType::String, "0.0.0.0", {"address to connect / bind to"}});
+
+  workflowOptions.push_back(
+    ConfigParamSpec{
       "default-transport", VariantType::String, "shmem", {"default transport: shmem, zeromq"}});
 
   workflowOptions.push_back(
@@ -63,10 +71,14 @@ WorkflowSpec defineDataProcessing(ConfigContext const& config)
   // vectored options
   // use the OutputChannelSpec as a tool to create the default configuration for the out-of-band channel
   OutputChannelSpec externalChannelSpec;
-  externalChannelSpec.name = inputs[0].binding;
+  externalChannelSpec.name = "downstream";
   externalChannelSpec.type = ChannelType::Push;
-  externalChannelSpec.method = ChannelMethod::Bind;
-  externalChannelSpec.hostname = "localhost";
+  if (config.options().get<std::string>("output-proxy-method") == "bind") {
+    externalChannelSpec.method = ChannelMethod::Bind;
+  } else if (config.options().get<std::string>("output-proxy-method") == "connect") {
+    externalChannelSpec.method = ChannelMethod::Connect;
+  }
+  externalChannelSpec.hostname = config.options().get<std::string>("output-proxy-address");
   externalChannelSpec.port = defaultPort;
   externalChannelSpec.listeners = 0;
   // in principle, protocol and transport are two different things but fur simplicity

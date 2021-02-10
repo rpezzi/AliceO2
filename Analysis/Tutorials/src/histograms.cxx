@@ -16,6 +16,7 @@
 
 using namespace o2;
 using namespace o2::framework;
+using namespace o2::framework::expressions;
 
 // This is a very simple example showing how to create an histogram
 // FIXME: this should really inherit from AnalysisTask but
@@ -58,6 +59,8 @@ struct CTask {
   OutputObj<TH1F> trZ{"trZ", OutputObjHandlingPolicy::QAObject};
   Configurable<float> pTCut{"pTCut", 0.5f, "Lower pT limit"};
 
+  Filter ptfilter = aod::track::pt > pTCut;
+
   void init(InitContext const&)
   {
     trZ.setObject(new TH1F("Z", "Z", 100, -10., 10.));
@@ -67,12 +70,10 @@ struct CTask {
     // trZ.setObject({"Z","Z",100,-10.,10.}); <- creates new
   }
 
-  void process(aod::Tracks const& tracks)
+  void process(soa::Filtered<aod::Tracks> const& tracks)
   {
     for (auto& track : tracks) {
-      if (track.pt2() < pTCut * pTCut)
-        continue;
-      ptH->Fill(std::sqrt(track.pt2()));
+      ptH->Fill(track.pt());
       trZ->Fill(track.z());
     }
   }
@@ -93,7 +94,7 @@ struct DTask {
     auto pHist = dynamic_cast<TH1F*>(list->At(0));
     auto etaHist = dynamic_cast<TH1F*>(list->At(1));
 
-    pHist->Fill(std::sqrt(track.p2()));
+    pHist->Fill(track.p());
     etaHist->Fill(track.eta());
   }
 };

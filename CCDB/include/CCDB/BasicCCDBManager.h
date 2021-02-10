@@ -87,7 +87,7 @@ class BasicCCDBManager
   bool isCachingEnabled() const { return mCachingEnabled; }
 
   /// disable or enable caching
-  void setCachingEnabled(bool v)
+  void setCaching(bool v)
   {
     mCachingEnabled = v;
     if (!v) {
@@ -96,10 +96,10 @@ class BasicCCDBManager
   }
 
   /// check if checks of object validity before CCDB query is enabled
-  bool isValidityCheckingEnabled() const { return mCheckObjValidityEnabled; }
+  bool isLocalObjectValidityCheckingEnabled() const { return mCheckObjValidityEnabled; }
 
   /// set the flag to check object validity before CCDB query
-  void setValidityCheckingEnabled(bool v = true) { mCheckObjValidityEnabled = v; }
+  void setLocalObjectValidityChecking(bool v = true) { mCheckObjValidityEnabled = v; }
 
   /// set the object upper validity limit
   void setCreatedNotAfter(long v) { mCreatedNotAfter = v; }
@@ -147,8 +147,9 @@ T* BasicCCDBManager::getForTimeStamp(std::string const& path, long timestamp)
                                                  mCreatedNotBefore ? std::to_string(mCreatedNotBefore) : "");
   }
   auto& cached = mCache[path];
-  if (mCheckObjValidityEnabled && cached.isValid(timestamp))
+  if (mCheckObjValidityEnabled && cached.isValid(timestamp)) {
     return reinterpret_cast<T*>(cached.objPtr.get());
+  }
 
   T* ptr = mCCDBAccessor.retrieveFromTFileAny<T>(path, mMetaData, timestamp, &mHeaders, cached.uuid,
                                                  mCreatedNotAfter ? std::to_string(mCreatedNotAfter) : "",

@@ -16,18 +16,13 @@
 #include "MIDWorkflow/RawDecoderSpec.h"
 
 #include <chrono>
-#include "Framework/ConfigParamRegistry.h"
-#include "Framework/ControlService.h"
+#include "Framework/CallbackService.h"
 #include "Framework/Logger.h"
 #include "Framework/Output.h"
 #include "Framework/Task.h"
-#include "Framework/WorkflowSpec.h"
 #include "DPLUtils/DPLRawParser.h"
-#include "MIDRaw/FEEIdConfig.h"
-#include "MIDRaw/CrateMasks.h"
+#include "Headers/RDHAny.h"
 #include "MIDRaw/Decoder.h"
-#include "MIDRaw/GBTBareDecoder.h"
-#include "MIDRaw/GBTUserLogicDecoder.h"
 
 namespace of = o2::framework;
 
@@ -36,91 +31,88 @@ namespace o2
 namespace mid
 {
 
-template <typename GBTDECODER>
 class RawDecoderDeviceDPL
 {
  public:
+  RawDecoderDeviceDPL(bool isDebugMode, const FEEIdConfig& feeIdConfig, const CrateMasks& crateMasks, const ElectronicsDelay& electronicsDelay, header::DataHeader::SubSpecificationType subSpec) : mIsDebugMode(isDebugMode), mFeeIdConfig(feeIdConfig), mCrateMasks(crateMasks), mElectronicsDelay(electronicsDelay), mSubSpec(subSpec) {}
+
   void init(of::InitContext& ic)
   {
     auto stop = [this]() {
-      LOG(INFO) << "Capacities: ROFRecords: " << mDecoder.getROFRecords().capacity() << "  LocalBoards: " << mDecoder.getData().capacity();
+      LOG(INFO) << "Capacities: ROFRecords: " << mDecoder->getROFRecords().capacity() << "  LocalBoards: " << mDecoder->getData().capacity();
       double scaleFactor = 1.e6 / mNROFs;
       LOG(INFO) << "Processing time / " << mNROFs << " ROFs: full: " << mTimer.count() * scaleFactor << " us  decoding: " << mTimerAlgo.count() * scaleFactor << " us";
     };
     ic.services().get<of::CallbackService>().set(of::CallbackService::Id::Stop, stop);
-
-    auto feeIdConfigFilename = ic.options().get<std::string>("feeId-config-file");
-    if (!feeIdConfigFilename.empty()) {
-      o2::mid::FEEIdConfig feeIdConfig(feeIdConfigFilename.c_str());
-      mDecoder.setFeeIdConfig(feeIdConfig);
-    }
-    auto crateMasksFilename = ic.options().get<std::string>("crate-masks-file");
-    if (!crateMasksFilename.empty()) {
-      o2::mid::CrateMasks crateMasks(crateMasksFilename.c_str());
-      mDecoder.setCrateMasks(crateMasks);
-    }
-
-    auto isDebugMode = ic.options().get<bool>("debug-mode");
-    mDecoder.init(isDebugMode);
   }
 
   void run(of::ProcessingContext& pc)
   {
     auto tStart = std::chrono::high_resolution_clock::now();
 
-    auto msg = pc.inputs().get("mid_raw");
-    auto buffer = of::DataRefUtils::as<const uint8_t>(msg);
-
     auto tAlgoStart = std::chrono::high_resolution_clock::now();
     of::DPLRawParser parser(pc.inputs());
 
-    mDecoder.clear();
-    for (auto it = parser.begin(), end = parser.end(); it != end; ++it) {
-      // retrieving RDH v4
-      auto rdhPtr = it.get_if<o2::header::RAWDataHeader>();
-      gsl::span<const uint8_t> payload(it.data(), it.size());
-      mDecoder.process(payload, *rdhPtr);
+    if (!mDecoder) {
+      auto const* rdhPtr = reinterpret_cast<const o2::header::RDHAny*>(parser.begin().raw());
+      mDecoder = createDecoder(*rdhPtr, mIsDebugMode, mElectronicsDelay, mCrateMasks, mFeeIdConfig);
     }
 
-    mDecoder.flush();
+    mDecoder->clear();
+    for (auto it = parser.begin(), end = parser.end(); it != end; ++it) {
+      auto const* rdhPtr = reinterpret_cast<const o2::header::RDHAny*>(it.raw());
+      gsl::span<const uint8_t> payload(it.data(), it.size());
+      mDecoder->process(payload, *rdhPtr);
+    }
+
     mTimerAlgo += std::chrono::high_resolution_clock::now() - tAlgoStart;
 
-    pc.outputs().snapshot(of::Output{header::gDataOriginMID, "DECODED", 0, of::Lifetime::Timeframe}, mDecoder.getData());
-    pc.outputs().snapshot(of::Output{header::gDataOriginMID, "DECODEDROF", 0, of::Lifetime::Timeframe}, mDecoder.getROFRecords());
+    pc.outputs().snapshot(of::Output{header::gDataOriginMID, "DECODED", mSubSpec}, mDecoder->getData());
+    pc.outputs().snapshot(of::Output{header::gDataOriginMID, "DECODEDROF", mSubSpec}, mDecoder->getROFRecords());
 
     mTimer += std::chrono::high_resolution_clock::now() - tStart;
-    mNROFs += mDecoder.getROFRecords().size();
+    mNROFs += mDecoder->getROFRecords().size();
   }
 
  private:
-  Decoder<GBTDECODER> mDecoder{};
+  std::unique_ptr<Decoder> mDecoder{nullptr};
+  bool mIsDebugMode{false};
+  FEEIdConfig mFeeIdConfig{};
+  CrateMasks mCrateMasks{};
+  ElectronicsDelay mElectronicsDelay{};
+  header::DataHeader::SubSpecificationType mSubSpec{0};
   std::chrono::duration<double> mTimer{0};     ///< full timer
   std::chrono::duration<double> mTimerAlgo{0}; ///< algorithm timer
   unsigned int mNROFs{0};                      /// Total number of processed ROFs
 };
 
-of::AlgorithmSpec getAlgorithmSpec(bool isBare)
+of::DataProcessorSpec getRawDecoderSpec(bool isDebugMode, const FEEIdConfig& feeIdConfig, const CrateMasks& crateMasks, const ElectronicsDelay& electronicsDelay, const std::vector<of::InputSpec>& inputSpecs, o2::header::DataHeader::SubSpecificationType subSpecType)
 {
-  if (isBare) {
-    return of::adaptFromTask<o2::mid::RawDecoderDeviceDPL<o2::mid::GBTBareDecoder>>();
-  }
-  return of::adaptFromTask<o2::mid::RawDecoderDeviceDPL<o2::mid::GBTUserLogicDecoder>>();
-}
-
-framework::DataProcessorSpec getRawDecoderSpec(bool isBare)
-{
-  std::vector<of::InputSpec> inputSpecs{of::InputSpec{"mid_raw", of::ConcreteDataTypeMatcher{header::gDataOriginMID, header::gDataDescriptionRawData}, of::Lifetime::Timeframe}};
-  std::vector<of::OutputSpec> outputSpecs{of::OutputSpec{header::gDataOriginMID, "DECODED", 0, of::Lifetime::Timeframe}, of::OutputSpec{header::gDataOriginMID, "DECODEDROF", 0, of::Lifetime::Timeframe}};
-
+  std::vector<of::OutputSpec> outputSpecs{of::OutputSpec{header::gDataOriginMID, "DECODED", subSpecType, of::Lifetime::Timeframe}, of::OutputSpec{header::gDataOriginMID, "DECODEDROF", subSpecType, of::Lifetime::Timeframe}};
   return of::DataProcessorSpec{
     "MIDRawDecoder",
     {inputSpecs},
     {outputSpecs},
-    getAlgorithmSpec(isBare),
-    of::Options{
-      {"feeId-config-file", of::VariantType::String, "", {"Filename with crate FEE ID correspondence"}},
-      {"crate-masks-file", of::VariantType::String, "", {"Filename with crate masks"}},
-      {"debug-mode", of::VariantType::Bool, false, {"Debug mode: sends all boards"}}}};
+    of::adaptFromTask<o2::mid::RawDecoderDeviceDPL>(isDebugMode, feeIdConfig, crateMasks, electronicsDelay, subSpecType)};
+}
+
+of::DataProcessorSpec getRawDecoderSpec(bool isDebugMode)
+{
+  return getRawDecoderSpec(isDebugMode, FEEIdConfig(), CrateMasks(), ElectronicsDelay());
+}
+
+of::DataProcessorSpec getRawDecoderSpec(bool isDebugMode, const FEEIdConfig& feeIdConfig, const CrateMasks& crateMasks, const ElectronicsDelay& electronicsDelay)
+{
+  std::vector<of::InputSpec> inputSpecs{{"mid_raw", of::ConcreteDataTypeMatcher{header::gDataOriginMID, header::gDataDescriptionRawData}, of::Lifetime::Timeframe}};
+  header::DataHeader::SubSpecificationType subSpec{0};
+  return getRawDecoderSpec(isDebugMode, FEEIdConfig(), CrateMasks(), ElectronicsDelay(), inputSpecs, subSpec);
+}
+
+of::DataProcessorSpec getRawDecoderSpec(bool isDebugMode, const FEEIdConfig& feeIdConfig, const CrateMasks& crateMasks, const ElectronicsDelay& electronicsDelay, header::DataHeader::SubSpecificationType subSpec)
+{
+  std::vector<of::InputSpec> inputSpecs{{"mid_raw", header::gDataOriginMID, header::gDataDescriptionRawData, subSpec, o2::framework::Lifetime::Timeframe}};
+
+  return getRawDecoderSpec(isDebugMode, feeIdConfig, crateMasks, electronicsDelay, inputSpecs, subSpec);
 }
 } // namespace mid
 } // namespace o2

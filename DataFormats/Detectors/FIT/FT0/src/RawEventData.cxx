@@ -15,96 +15,61 @@
 
 using namespace o2::ft0;
 
-using namespace std;
-
-ClassImp(RawEventData);
-
-void RawEventData::generateData()
+void EventHeader::print() const
 {
-  for (int iCh = 0; iCh < mEventHeader.nGBTWords * 2; iCh++) {
-    mEventData[iCh].channelID = iCh;
-    mEventData[iCh].charge = 1000;
-    mEventData[iCh].time = 500;
-    mEventData[iCh].is1TimeLostEvent = 1;
-    mEventData[iCh].is2TimeLostEvent = 1;
-    mEventData[iCh].isADCinGate = 1;
-    mEventData[iCh].isAmpHigh = 1;
-    mEventData[iCh].isDoubleEvent = 1;
-    mEventData[iCh].isEventInTVDC = 1;
-    mEventData[iCh].isTimeInfoLate = 1;
-    mEventData[iCh].isTimeInfoLost = 1;
-    mEventData[iCh].numberADC = 1;
-  }
+  std::cout << std::hex;
+  std::cout << "################EventHeader###############" << std::endl;
+  std::cout << "startDescriptor: " << startDescriptor << std::endl;
+  std::cout << "nGBTWords: " << nGBTWords << std::endl;
+  std::cout << "BC: " << bc << std::endl;
+  std::cout << "Orbit: " << orbit << std::endl;
+  std::cout << "##########################################" << std::endl;
+  std::cout << std::dec;
 }
 
-void RawEventData::generateHeader(int nChannels)
+void EventData::print() const
 {
-  mEventHeader.startDescriptor = 15;
-  mEventHeader.nGBTWords = (nChannels + 1) / 2;
-  mEventHeader.reservedField1 = 0;
-  mEventHeader.reservedField2 = 0;
-  mEventHeader.bc = 200;
-  mEventHeader.orbit = 100;
+  std::cout << std::hex;
+  std::cout << "###############EventData(PM)##############" << std::endl;
+  std::cout << "------------Channel " << channelID << "------------" << std::endl;
+  std::cout << "Charge: " << charge << std::endl;
+  std::cout << "Time: " << time << std::endl;
+  std::cout << "numberADC: " << numberADC << std::endl;
+  std::cout << "isDoubleEvent: " << isDoubleEvent << std::endl;
+  std::cout << "isTimeInfoNOTvalid: " << isTimeInfoNOTvalid << std::endl;
+  std::cout << "isCFDinADCgate: " << isCFDinADCgate << std::endl;
+  std::cout << "isTimeInfoLate: " << isTimeInfoLate << std::endl;
+  std::cout << "isAmpHigh: " << isAmpHigh << std::endl;
+  std::cout << "isEventInTVDC: " << isEventInTVDC << std::endl;
+  std::cout << "isTimeInfoLost: " << isTimeInfoLost << std::endl;
+  std::cout << "##########################################" << std::endl;
+  std::cout << std::dec;
 }
 
-void RawEventData::generateRandomHeader(int nChannels)
+void TCMdata::print() const
 {
-  mEventHeader.startDescriptor = 0x0000000f;
-  if (nChannels > 0 && nChannels < 13)
-    mEventHeader.nGBTWords = (nChannels + 1) / 2;
-  else
-    mEventHeader.nGBTWords = 1;
-  mEventHeader.bc = std::rand() % 2000; // 1999-max bc
-  mEventHeader.orbit = std::rand() % 100;
+  std::cout << std::hex;
+  std::cout << "################TCMdata###################" << std::endl;
+  std::cout << "orC: " << orC << std::endl;
+  std::cout << "orA: " << orA << std::endl;
+  std::cout << "sCen: " << sCen << std::endl;
+  std::cout << "cen: " << cen << std::endl;
+  std::cout << "vertex: " << vertex << std::endl;
+  std::cout << "nChanA: " << nChanA << std::endl;
+  std::cout << "nChanC: " << nChanC << std::endl;
+  std::cout << "amplA: " << amplA << std::endl;
+  std::cout << "amplC: " << amplC << std::endl;
+  std::cout << "timeA: " << timeA << std::endl;
+  std::cout << "timeC: " << timeC << std::endl;
+  std::cout << "##########################################" << std::endl;
+  std::cout << std::dec;
 }
 
-void RawEventData::generateRandomData()
+void TCMdataExtended::print() const
 {
-  for (int iCh = 0; iCh < mEventHeader.nGBTWords * 2; iCh++) {
-    mEventData[iCh].channelID = std::rand() % 208 + 1;
-    mEventData[iCh].charge = std::rand() % 1000;
-    mEventData[iCh].time = std::rand() % 500;
-    mEventData[iCh].is1TimeLostEvent = std::rand() % 2;
-    mEventData[iCh].is2TimeLostEvent = std::rand() % 2;
-    mEventData[iCh].isADCinGate = std::rand() % 2;
-    mEventData[iCh].isAmpHigh = std::rand() % 2;
-    mEventData[iCh].isDoubleEvent = std::rand() % 2;
-    mEventData[iCh].isEventInTVDC = std::rand() % 2;
-    mEventData[iCh].isTimeInfoLate = std::rand() % 2;
-    mEventData[iCh].isTimeInfoLost = std::rand() % 2;
-    mEventData[iCh].numberADC = std::rand() % 2;
-  }
-}
-
-void RawEventData::generateRandomEvent(int nChannels)
-{
-  generateRandomHeader(nChannels);
-  generateRandomData();
-}
-
-void RawEventData::print()
-{
-  std::cout << "==================Raw event data==================" << endl;
-  std::cout << "##################Header##################" << endl;
-  std::cout << "startDescriptor: " << mEventHeader.startDescriptor << endl;
-  std::cout << "Nchannels: " << mEventHeader.nGBTWords * 2 << endl;
-  std::cout << "BC: " << mEventHeader.bc << endl;
-  std::cout << "Orbit: " << mEventHeader.orbit << endl;
-  std::cout << "##########################################" << endl;
-  std::cout << "###################DATA###################" << endl;
-  for (int iCh = 0; iCh < mEventHeader.nGBTWords * 2; iCh++) {
-    std::cout << "------------Channel " << mEventData[iCh].channelID << "------------" << endl;
-    std::cout << "Charge: " << mEventData[iCh].charge << endl;
-    std::cout << "Time: " << mEventData[iCh].time << endl;
-    std::cout << "1TimeLostEvent: " << mEventData[iCh].is1TimeLostEvent << endl;
-    std::cout << "2TimeLostEvent: " << mEventData[iCh].is2TimeLostEvent << endl;
-    std::cout << "ADCinGate: " << mEventData[iCh].isADCinGate << endl;
-    std::cout << "AmpHigh: " << mEventData[iCh].isAmpHigh << endl;
-    std::cout << "DoubleEvent: " << mEventData[iCh].isDoubleEvent << endl;
-    std::cout << "EventInTVDC: " << mEventData[iCh].isEventInTVDC << endl;
-    std::cout << "TimeInfoLate: " << mEventData[iCh].isTimeInfoLate << endl;
-    std::cout << "TimeInfoLost: " << mEventData[iCh].isTimeInfoLost << endl;
-    std::cout << "numberADC: " << mEventData[iCh].numberADC << endl;
-  }
-  std::cout << "##########################################" << endl;
+  std::cout << std::hex;
+  std::cout << "############TCMdataExtended###############" << std::endl;
+  std::cout << "triggerWord: " << triggerWord << std::endl;
+  std::cout << "##########################################" << std::endl;
+  std::cout << std::dec;
 }

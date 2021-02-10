@@ -89,7 +89,7 @@ Int_t DigitDump::updateCRU(const CRU& cru, const Int_t row, const Int_t pad,
   //printf("updateCRU: %d, %d (%d, %d), %d, %d, %f, %f\n", int(cru), row, globalRow, sectorRow, pad, timeBin, signal, pedestal);
 
   // fill digits
-  mDigits[cru.sector()].emplace_back(cru, signalCorr, globalRow, pad, timeBin);
+  addDigit(cru, signalCorr, globalRow, pad, timeBin);
 
   return 0;
 }
@@ -100,10 +100,12 @@ void DigitDump::sortDigits()
   // sort digits
   for (auto& digits : mDigits) {
     std::sort(digits.begin(), digits.end(), [](const auto& a, const auto& b) {
-      if (a.getTimeStamp() < b.getTimeStamp())
+      if (a.getTimeStamp() < b.getTimeStamp()) {
         return true;
-      if ((a.getTimeStamp() == b.getTimeStamp()) && (a.getRow() < b.getRow()))
+      }
+      if ((a.getTimeStamp() == b.getTimeStamp()) && (a.getRow() < b.getRow())) {
         return true;
+      }
       return false;
     });
   }

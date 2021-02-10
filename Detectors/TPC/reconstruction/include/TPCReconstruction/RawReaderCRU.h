@@ -58,16 +58,21 @@ enum DebugLevel : uint8_t {
 
 /// data type
 enum class DataType : uint8_t {
-  TryToDetect = 0, ///< try to auto detect the mode
-  Continuous = 1,  ///< continuous data taking
-  HBScaling = 2,   ///< heart beat sclaing mode
-  Triggered = 3    ///< triggered data
+  Continuous = 1, ///< continuous data taking
+  HBScaling = 2,  ///< heart beat sclaing mode
+  Triggered = 3,  ///< triggered data
 };
 
 /// file type
 enum class ReaderType : uint8_t {
-  FLPData = 0, ///< single files from FLP as 8k pages with RAWDataHeader
-  EPNData = 1  ///< STF builder data merged on EPN
+  FLP = 0, ///< single files from FLP as 8k pages with RAWDataHeader
+  EPN = 1, ///< STF builder data merged on EPN
+};
+
+/// data type
+enum class RAWDataType : uint8_t {
+  GBT = 0,    ///< GBT encoded raw data
+  LinkZS = 1, ///< Link based zero suppression
 };
 
 using RDH = o2::header::RAWDataHeader;
@@ -104,10 +109,11 @@ class ADCRawData
   /// limit.
   void setNumTimebins(uint32_t numTB)
   {
-    if (numTB >= mADCRaw[mOutputStream].size())
+    if (numTB >= mADCRaw[mOutputStream].size()) {
       mNumTimeBins = mADCRaw[mOutputStream].size();
-    else
+    } else {
       mNumTimeBins = numTB;
+    }
   };
 
   /// number of time bin for selected stream
@@ -161,6 +167,10 @@ class SyncPosition
   /// return half word position
   uint32_t getHalfWordPosition() const { return mHalfWordPos; };
 
+  uint32_t getFrameNumber() const { return mFrameNum; }
+
+  uint32_t getPacketNumber() const { return mPacketNum; }
+
   /// return if sync was found
   bool synched() const { return mSyncFound; };
 
@@ -203,7 +213,7 @@ class GBTFrame
 
   /// set syncronisation found for stream
   /// \param stream stream
-  bool mSyncFound(int stream) { return mSyncPos[stream].synched(); };
+  bool syncFound(int stream) { return mSyncPos[stream].synched(); };
 
   /// get the syncronisation array
   const SyncArray& getSyncArray() const { return mSyncPos; }
@@ -298,6 +308,9 @@ class RawReaderCRUEventSync
 
   using RDH = o2::header::RAWDataHeader;
 
+  /// default ctor
+  RawReaderCRUEventSync() { reset(); }
+
   // ---------------------------------------------------------------------------
   /// \struct LinkInfo
   /// \brief helper to store link information in an event
@@ -386,13 +399,15 @@ class RawReaderCRUEventSync
   /// get link information for a specific event and cru
   LinkInfo& getLinkInfo(const RDH& rdh, DataType dataType)
   {
-    // check if event is already registered. If not create a new one.
-    auto& event = createEvent(rdh, dataType);
+    if (!mLastEvent) {
+      createEvent(rdh, dataType);
+    }
 
     const auto dataWrapperID = RDHUtils::getEndPointID(rdh);
     const auto linkID = RDHUtils::getLinkID(rdh);
     const auto globalLinkID = linkID + dataWrapperID * 12;
-    return event.CRUInfoArray[RDHUtils::getCRUID(rdh)].LinkInformation[globalLinkID];
+
+    return mLastEvent->CRUInfoArray[RDHUtils::getCRUID(rdh)].LinkInformation[globalLinkID];
   }
 
   /// get array with all link informaiton for a specific event number and cru
@@ -442,13 +457,19 @@ class RawReaderCRUEventSync
   void setLinksSeen(const CRU cru, const std::bitset<MaxNumberOfLinks>& links);
 
   /// set a cru as seen
-  void setCRUSeen(const CRU cru) { mCRUSeen[cru] = true; }
+  void setCRUSeen(const CRU cru, const uint16_t reader = 0) { mCRUSeen[cru] = reader; }
+
+  /// return CRU seen information
+  const auto& getCRUSeen() const { return mCRUSeen; }
+
+  /// get the reader associated to the CRU
+  uint32_t getReaderNumber(uint32_t cru) { return mCRUSeen[cru]; }
 
   /// reset all information
   void reset()
   {
     mEventInformation.clear();
-    mCRUSeen.reset();
+    mCRUSeen.fill(-1);
   }
 
   /// overloading output stream operator
@@ -459,8 +480,9 @@ class RawReaderCRUEventSync
   }
 
  private:
-  EventInfoVector mEventInformation{}; ///< event information
-  std::bitset<CRU::MaxCRU> mCRUSeen{}; ///< if cru was seen
+  EventInfoVector mEventInformation{};         ///< event information
+  EventInfo* mLastEvent{nullptr};              ///< Last event that was created
+  std::array<int16_t, CRU::MaxCRU> mCRUSeen{}; ///< if cru was seen, number is for which decoder
 
   ClassDefNV(RawReaderCRUEventSync, 0); // event synchronisation for raw reader instances
 };                                      // class RawReaderCRUEventSync
@@ -476,6 +498,8 @@ class RawReaderCRU
 {
  public:
   class PacketDescriptor;
+  using PacketDescriptorMap = std::vector<PacketDescriptor>;
+  using PacketDescriptorMapArray = std::array<PacketDescriptorMap, MaxNumberOfLinks>;
 
   /// constructor
   /// \param
@@ -485,12 +509,14 @@ class RawReaderCRU
                uint32_t stream = 0,
                uint32_t debugLevel = 0,
                uint32_t verbosity = 0,
-               const std::string_view outputFilePrefix = "")
+               const std::string_view outputFilePrefix = "",
+               uint32_t readerNumber = 0)
     : mDebugLevel(debugLevel),
       mVerbosity(verbosity),
       mNumTimeBins(numTimeBins),
       mLink(link),
       mStream(stream),
+      mReaderNumber(readerNumber),
       mCRU(),
       mFileSize(-1),
       mPacketsPerLink(),
@@ -536,8 +562,14 @@ class RawReaderCRU
   /// set event number
   void setEventNumber(uint32_t eventNumber = 0) { mEventNumber = eventNumber; }
 
+  /// set the reader number in the manager
+  void setReaderNumber(uint32_t readerNumber) { mReaderNumber = readerNumber; }
+
   /// set filling of ADC data map
   void setFillADCdataMap(bool fill) { mFillADCdataMap = fill; }
+
+  /// get filling of ADC data map
+  bool getFillADCdataMap() const { return mFillADCdataMap; }
 
   /// get event number
   uint32_t getEventNumber() const { return mEventNumber; }
@@ -603,8 +635,20 @@ class RawReaderCRU
   /// copy single events to another file
   void copyEvents(const std::vector<uint32_t>& eventNumbers, std::string outputDirectory, std::ios_base::openmode mode = std::ios_base::openmode(0));
 
+  /// write GBT data into separate files per link
+  void writeGBTDataPerLink(std::string_view outputDirectory, int maxEvents = -1);
+
   /// run a data filling callback function
   void runADCDataCallback(const ADCRawData& rawData);
+
+  /// set output file prefix
+  void setOutputFilePrefix(std::string_view prefix) { mOutputFilePrefix = prefix; }
+
+  /// output file prefix
+  const std::string& getOutputFilePrefix() const { return mOutputFilePrefix; }
+
+  /// get packet descriptor map array
+  const PacketDescriptorMapArray& getPacketDescriptorMaps() const { return mPacketDescriptorMaps; }
 
   //===========================================================================
   //===| Nested helper classes |===============================================
@@ -642,10 +686,10 @@ class RawReaderCRU
   class PacketDescriptor
   {
    public:
-    PacketDescriptor(uint32_t headOff, uint32_t cruID, uint32_t linkID, uint32_t dataWrapperID, uint16_t memorySize = 7840, uint16_t packetSize = 8192) : mHeaderOffset(headOff),
-                                                                                                                                                          mFEEID(cruID + (linkID << 9) + (dataWrapperID << 13)),
-                                                                                                                                                          mMemorySize(memorySize),
-                                                                                                                                                          mPacketSize(packetSize)
+    PacketDescriptor(size_t headOff, uint32_t cruID, uint32_t linkID, uint32_t dataWrapperID, uint16_t memorySize = 7840, uint16_t packetSize = 8192) : mHeaderOffset(headOff),
+                                                                                                                                                        mFEEID(cruID + (linkID << 9) + (dataWrapperID << 13)),
+                                                                                                                                                        mMemorySize(memorySize),
+                                                                                                                                                        mPacketSize(packetSize)
     {
     }
 
@@ -673,10 +717,10 @@ class RawReaderCRU
     }
 
    private:
-    uint32_t mHeaderOffset; ///< header offset
-    uint16_t mMemorySize;   ///< payload size
-    uint16_t mPacketSize;   ///< packet size
-    uint16_t mFEEID;        ///< link ID -- BIT 0-8: CRUid -- BIT 9-12: LinkID -- BIT 13: DataWrapperID -- BIT 14,15: unused
+    size_t mHeaderOffset; ///< header offset
+    uint16_t mMemorySize; ///< payload size
+    uint16_t mPacketSize; ///< packet size
+    uint16_t mFEEID;      ///< link ID -- BIT 0-8: CRUid -- BIT 9-12: LinkID -- BIT 13: DataWrapperID -- BIT 14,15: unused
   };
 
   // ===========================================================================
@@ -684,28 +728,30 @@ class RawReaderCRU
   //
 
  private:
-  using PacketDescriptorMap = std::vector<PacketDescriptor>;
-  uint32_t mDebugLevel;                                                    ///< debug level
-  uint32_t mVerbosity;                                                     ///< verbosity
-  uint32_t mNumTimeBins;                                                   ///< number of time bins to process
-  uint32_t mLink;                                                          ///< present link being processed
-  uint32_t mStream;                                                        ///< present stream being processed
-  uint32_t mEventNumber = 0;                                               ///< current event number to process
-  CRU mCRU;                                                                ///< CRU
-  int mFileSize;                                                           ///< size of the input file
-  bool mDumpTextFiles = false;                                             ///< dump debugging text files
-  bool mFillADCdataMap = true;                                             ///< fill the ADC data map
-  bool mForceCRU = false;                                                  ///< force CRU: overwrite value from RDH
-  bool mFileIsScanned = false;                                             ///< if file was already scanned
-  std::array<uint32_t, MaxNumberOfLinks> mPacketsPerLink;                  ///< array to keep track of the number of packets per link
-  std::bitset<MaxNumberOfLinks> mLinkPresent;                              ///< info if link is present in data; information retrieved from scanning the RDH headers
-  std::array<PacketDescriptorMap, MaxNumberOfLinks> mPacketDescriptorMaps; ///< array to hold vectors thhe packet descriptors
-  std::string mInputFileName;                                              ///< input file name
-  std::string mOutputFilePrefix;                                           ///< input file name
-  std::array<SyncArray, MaxNumberOfLinks> mSyncPositions{};                ///< sync positions for each link
+  uint32_t mDebugLevel;                                     ///< debug level
+  uint32_t mVerbosity;                                      ///< verbosity
+  uint32_t mNumTimeBins;                                    ///< number of time bins to process
+  uint32_t mLink;                                           ///< present link being processed
+  uint32_t mStream;                                         ///< present stream being processed
+  uint32_t mEventNumber = 0;                                ///< current event number to process
+  uint32_t mReaderNumber = 0;                               ///< raw reader number in manager
+  CRU mCRU;                                                 ///< CRU
+  size_t mFileSize;                                         ///< size of the input file
+  bool mDumpTextFiles = false;                              ///< dump debugging text files
+  bool mFillADCdataMap = true;                              ///< fill the ADC data map
+  bool mForceCRU = false;                                   ///< force CRU: overwrite value from RDH
+  bool mFileIsScanned = false;                              ///< if file was already scanned
+  std::array<uint32_t, MaxNumberOfLinks> mPacketsPerLink;   ///< array to keep track of the number of packets per link
+  std::bitset<MaxNumberOfLinks> mLinkPresent;               ///< info if link is present in data; information retrieved from scanning the RDH headers
+  PacketDescriptorMapArray mPacketDescriptorMaps;           ///< array to hold vectors thhe packet descriptors
+  std::string mInputFileName;                               ///< input file name
+  std::string mOutputFilePrefix;                            ///< input file name
+  std::array<SyncArray, MaxNumberOfLinks> mSyncPositions{}; ///< sync positions for each link
   // not so nice but simplest way to store the ADC data
   std::map<PadPos, std::vector<uint16_t>> mADCdata; ///< decoded ADC data
   RawReaderCRUManager* mManager{nullptr};           ///< event synchronization information
+
+  std::ifstream mFileHandle; ///< file handle for input file
 
   /// collect raw GBT data
   void collectGBTData(std::vector<o2::byte>& data);
@@ -729,18 +775,19 @@ inline void GBTFrame::updateSyncCheck(SyncArray& syncArray)
 {
   const auto offset = mPrevHWpos ^ 4;
 
-  for (int s = 0; s < 5; s++)
+  for (int s = 0; s < 5; s++) {
     for (int h = 0; h < 4; h++) {
       const auto hPos = h + offset; // set position of last filled HW
       // shift in a 1 if the halfword is 0x15
-      if (mFrameHalfWords[s][hPos] == 0x15)
+      if (mFrameHalfWords[s][hPos] == 0x15) {
         mSyncCheckRegister[s] = (mSyncCheckRegister[s] << 1) | 1;
-      // shift in a 0 if the halfword is 0xA
-      else if (mFrameHalfWords[s][hPos] == 0xA)
+        // shift in a 0 if the halfword is 0xA
+      } else if (mFrameHalfWords[s][hPos] == 0xA) {
         mSyncCheckRegister[s] = (mSyncCheckRegister[s] << 1);
-      // otherwise reset the register to 0
-      else
+        // otherwise reset the register to 0
+      } else {
         mSyncCheckRegister[s] = 0;
+      }
       // std::cout << " SReg : " << s << " : " << std::hex << mSyncCheckRegister[s] << std::endl;
       // check the register content for the SYNC pattern
       // Patterh is : 1100.1100.1100.1100.1111.0000.1111.0000 = 0xCCCCF0F0
@@ -748,7 +795,8 @@ inline void GBTFrame::updateSyncCheck(SyncArray& syncArray)
       if (mSyncCheckRegister[s] == 0xCCCCF0F0 or mSyncCheckRegister[s] == 0x4CCCF0F0 or mSyncCheckRegister[s] == 0x0CCCF0F0) {
         syncArray[s].setPos(mPacketNum, mFrameNum, mFilePos, h);
       };
-    };
+    }
+  };
 }
 
 inline void GBTFrame::updateSyncCheck(bool verbose)
@@ -759,14 +807,15 @@ inline void GBTFrame::updateSyncCheck(bool verbose)
     for (int h = 0; h < 4; h++) {
       const auto hPos = h + offset; // set position of last filled HW
       // shift in a 1 if the halfword is 0x15
-      if (mFrameHalfWords[s][hPos] == 0x15)
+      if (mFrameHalfWords[s][hPos] == 0x15) {
         mSyncCheckRegister[s] = (mSyncCheckRegister[s] << 1) | 1;
-      // shift in a 0 if the halfword is 0xA
-      else if (mFrameHalfWords[s][hPos] == 0xA)
+        // shift in a 0 if the halfword is 0xA
+      } else if (mFrameHalfWords[s][hPos] == 0xA) {
         mSyncCheckRegister[s] = (mSyncCheckRegister[s] << 1);
-      // otherwise reset the register to 0
-      else
+        // otherwise reset the register to 0
+      } else {
         mSyncCheckRegister[s] = 0;
+      }
       // std::cout << " SReg : " << s << " : " << std::hex << mSyncCheckRegister[s] << std::endl;
       // check the register content for the SYNC pattern
       // Patterh is : 1100.1100.1100.1100.1111.0000.1111.0000 = 0xCCCCF0F0
@@ -841,6 +890,7 @@ class RawReaderCRUManager
 {
  public:
   using ADCDataCallback = std::function<Int_t(const PadROCPos&, const CRU&, const gsl::span<const uint32_t>)>;
+  using EndReaderCallback = std::function<void()>;
 
   /// constructor
   RawReaderCRUManager() = default;
@@ -855,7 +905,7 @@ class RawReaderCRUManager
                              const std::string_view outputFilePrefix = "")
   //RawReaderCRU& createReader(std::string_view fileName, uint32_t numTimeBins)
   {
-    mRawReadersCRU.emplace_back(std::make_unique<RawReaderCRU>(inputFileName, numTimeBins, 0, stream, debugLevel, verbosity, outputFilePrefix));
+    mRawReadersCRU.emplace_back(std::make_unique<RawReaderCRU>(inputFileName, numTimeBins, 0, stream, debugLevel, verbosity, outputFilePrefix, mRawReadersCRU.size()));
     mRawReadersCRU.back()->setManager(this);
     return *mRawReadersCRU.back().get();
   }
@@ -906,6 +956,9 @@ class RawReaderCRUManager
     }
   }
 
+  /// get the event sync
+  const RawReaderCRUEventSync& getEventSync() const { return mEventSync; }
+
   /// get number of all events
   size_t getNumberOfEvents() const { return mEventSync.getNumberOfEvents(); }
 
@@ -919,7 +972,12 @@ class RawReaderCRUManager
   void setDebugLevel(uint32_t debugLevel) { mDebugLevel = debugLevel; }
 
   /// set data type
-  void setDataType(DataType dataType) { mDataType = dataType; }
+  void setDataType(DataType dataType, RAWDataType rawType)
+  {
+    mDataType = dataType;
+    mRawDataType = rawType;
+    mDetectDataType = false;
+  }
 
   /// get data type
   DataType getDataType() const { return mDataType; }
@@ -930,14 +988,25 @@ class RawReaderCRUManager
   /// copy single events from raw input files to another file
   static void copyEvents(const std::string_view inputFileNames, const std::vector<uint32_t> eventNumbers, std::string_view outputDirectory, std::ios_base::openmode mode = std::ios_base::openmode(0));
 
+  /// copy single events from raw input files to another file
+  void writeGBTDataPerLink(std::string_view outputDirectory, int maxEvents = -1);
+
+  /// copy single events from raw input files to another file
+  static void writeGBTDataPerLink(const std::string_view inputFileNames, std::string_view outputDirectory, int maxEvents = -1);
+
   /// set a callback function
   void setADCDataCallback(ADCDataCallback function) { mADCDataCallback = function; }
+
+  /// process event calling mADCDataCallback to process values
+  void processEvent(uint32_t eventNumber, EndReaderCallback endReader = nullptr);
 
  private:
   std::vector<std::unique_ptr<RawReaderCRU>> mRawReadersCRU{}; ///< cru type raw readers
   RawReaderCRUEventSync mEventSync{};                          ///< event synchronisation
   uint32_t mDebugLevel{0};                                     ///< debug level
-  DataType mDataType{DataType::TryToDetect};                   ///< data type
+  DataType mDataType{DataType::Continuous};                    ///< data type
+  RAWDataType mRawDataType{RAWDataType::GBT};                  ///< raw data type
+  bool mDetectDataType{true};                                  ///< try to detect data types
   bool mIsInitialized{false};                                  ///< if init was called already
   ADCDataCallback mADCDataCallback{nullptr};                   ///< callback function for filling the ADC data
 

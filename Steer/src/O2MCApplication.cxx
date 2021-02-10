@@ -183,8 +183,9 @@ void O2MCApplicationBase::AddParticles()
   LOG(INFO) << param;
 
   // check if there are PDG codes requested for user decay
-  if (param.pdglist.empty())
+  if (param.pdglist.empty()) {
     return;
+  }
 
   // loop over PDG codes in the string
   std::stringstream ss(param.pdglist);
@@ -247,7 +248,6 @@ void O2MCApplication::SendData()
   attachSubEventInfo(simdataparts, *mSubEventInfo);
   auto tracks = attachBranch<std::vector<o2::MCTrack>>("MCTrack", *mSimDataChannel, simdataparts);
   attachBranch<std::vector<o2::TrackReference>>("TrackRefs", *mSimDataChannel, simdataparts);
-  attachBranch<o2::dataformats::MCTruthContainer<o2::TrackReference>>("IndexedTrackRefs", *mSimDataChannel, simdataparts);
   assert(tracks->size() == mSubEventInfo->npersistenttracks);
 
   for (auto det : listActiveDetectors) {

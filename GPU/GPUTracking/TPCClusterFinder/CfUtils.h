@@ -20,9 +20,7 @@
 #include "CfConsts.h"
 #include "GPUTPCClusterFinderKernels.h"
 
-namespace GPUCA_NAMESPACE
-{
-namespace gpu
+namespace GPUCA_NAMESPACE::gpu
 {
 
 class CfUtils
@@ -36,19 +34,19 @@ class CfUtils
 
   static GPUdi() bool innerAboveThreshold(uchar aboveThreshold, ushort outerIdx)
   {
-    return aboveThreshold & (1 << CfConsts::OuterToInner[outerIdx]);
+    return aboveThreshold & (1 << cfconsts::OuterToInner[outerIdx]);
   }
 
   static GPUdi() bool innerAboveThresholdInv(uchar aboveThreshold, ushort outerIdx)
   {
-    return aboveThreshold & (1 << CfConsts::OuterToInnerInv[outerIdx]);
+    return aboveThreshold & (1 << cfconsts::OuterToInnerInv[outerIdx]);
   }
 
   static GPUdi() bool isPeak(uchar peak) { return peak & 0x01; }
 
   static GPUdi() bool isAboveThreshold(uchar peak) { return peak >> 1; }
 
-  template <typename SharedMemory>
+  template <size_t SCRATCH_PAD_WORK_GROUP_SIZE, typename SharedMemory>
   static GPUdi() ushort partition(SharedMemory& smem, ushort ll, bool pred, ushort partSize, ushort* newPartSize)
   {
     bool participates = ll < partSize;
@@ -166,7 +164,6 @@ class CfUtils
   }
 };
 
-} // namespace gpu
-} // namespace GPUCA_NAMESPACE
+} // namespace GPUCA_NAMESPACE::gpu
 
 #endif

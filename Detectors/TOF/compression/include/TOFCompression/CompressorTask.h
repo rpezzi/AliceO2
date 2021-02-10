@@ -39,6 +39,7 @@ class CompressorTask : public Task
 
  private:
   Compressor<RDH, verbose> mCompressor;
+  int mOutputBufferSize;
 };
 
 } // namespace tof

@@ -22,6 +22,8 @@
 #include "FairLogger.h"   // for FairLogger
 #include "FairRootManager.h"
 #include "SimulationDataFormat/BaseHits.h"
+#include "SimulationDataFormat/StackParam.h"
+#include "CommonUtils/ConfigurationMacroHelper.h"
 
 #include "TLorentzVector.h" // for TLorentzVector
 #include "TParticle.h"      // for TParticle
@@ -72,12 +74,44 @@ Stack::Stack(Int_t size)
     mMinHits(1),
     mEnergyCut(0.),
     mTrackRefs(new std::vector<o2::TrackReference>),
-    mIndexedTrackRefs(new typename std::remove_pointer<decltype(mIndexedTrackRefs)>::type),
     mIsG4Like(false)
 {
   auto vmc = TVirtualMC::GetMC();
-  if (vmc && strcmp(vmc->GetName(), "TGeant4") == 0) {
-    mIsG4Like = true;
+  if (vmc) {
+    mIsG4Like = !(vmc->SecondariesAreOrdered());
+  }
+
+  auto& param = o2::sim::StackParam::Instance();
+  LOG(INFO) << param;
+  TransportFcn transportPrimary;
+  if (param.transportPrimary.compare("none") == 0) {
+    transportPrimary = [](const TParticle& p, const std::vector<TParticle>& particles) {
+      return false;
+    };
+  } else if (param.transportPrimary.compare("all") == 0) {
+    transportPrimary = [](const TParticle& p, const std::vector<TParticle>& particles) {
+      return true;
+    };
+  } else if (param.transportPrimary.compare("barrel") == 0) {
+    transportPrimary = [](const TParticle& p, const std::vector<TParticle>& particles) {
+      return (std::fabs(p.Eta()) < 2.0);
+    };
+  } else if (param.transportPrimary.compare("external") == 0) {
+    transportPrimary = o2::conf::GetFromMacro<o2::data::Stack::TransportFcn>(param.transportPrimaryFileName,
+                                                                             param.transportPrimaryFuncName,
+                                                                             "o2::data::Stack::TransportFcn", "stack_transport_primary");
+    if (!mTransportPrimary) {
+      LOG(FATAL) << "Failed to retrieve external \'transportPrimary\' function: problem with configuration ";
+    }
+    LOG(INFO) << "Successfully retrieve external \'transportPrimary\' frunction: " << param.transportPrimaryFileName;
+  } else {
+    LOG(FATAL) << "unsupported \'trasportPrimary\' mode: " << param.transportPrimary;
+  }
+
+  if (param.transportPrimaryInvert) {
+    mTransportPrimary = [transportPrimary](const TParticle& p, const std::vector<TParticle>& particles) { return !transportPrimary; };
+  } else {
+    mTransportPrimary = transportPrimary;
   }
 }
 
@@ -148,7 +182,15 @@ void Stack::PushTrack(Int_t toBeDone, Int_t parentId, Int_t pdgCode, Double_t px
 
 void Stack::PushTrack(Int_t toBeDone, Int_t parentId, Int_t pdgCode, Double_t px, Double_t py, Double_t pz, Double_t e,
                       Double_t vx, Double_t vy, Double_t vz, Double_t time, Double_t polx, Double_t poly, Double_t polz,
-                      TMCProcess proc, Int_t& ntr, Double_t weight, Int_t is, Int_t secondparentID)
+                      TMCProcess proc, Int_t& ntr, Double_t weight, Int_t is, Int_t secondparentId)
+{
+  PushTrack(toBeDone, parentId, pdgCode, px, py, pz, e, vx, vy, vz, time, polx, poly, polz, proc, ntr, weight, is, secondparentId, -1, -1, proc);
+}
+
+void Stack::PushTrack(Int_t toBeDone, Int_t parentId, Int_t pdgCode, Double_t px, Double_t py, Double_t pz, Double_t e,
+                      Double_t vx, Double_t vy, Double_t vz, Double_t time, Double_t polx, Double_t poly, Double_t polz,
+                      TMCProcess proc, Int_t& ntr, Double_t weight, Int_t is, Int_t secondparentId, Int_t daughter1Id, Int_t daughter2Id,
+                      TMCProcess proc2)
 {
   //  printf("Pushing %s toBeDone %5d parentId %5d pdgCode %5d is %5d entries %5d \n",
   //	 proc == kPPrimary ? "Primary:   " : "Secondary: ",
@@ -167,49 +209,64 @@ void Stack::PushTrack(Int_t toBeDone, Int_t parentId, Int_t pdgCode, Double_t px
   Int_t trackId = mNumberOfEntriesInParticles;
   // Set track variable
   ntr = trackId;
-  Int_t nPoints = 0;
-  Int_t daughter1Id = -1;
-  Int_t daughter2Id = -1;
+  //  Int_t daughter1Id = -1;
+  //  Int_t daughter2Id = -1;
   Int_t iStatus = (proc == kPPrimary) ? is : trackId;
-  TParticle p(pdgCode, iStatus, parentId, nPoints, daughter1Id, daughter2Id, px, py, pz, e, vx, vy, vz, time);
+  TParticle p(pdgCode, iStatus, parentId, secondparentId, daughter1Id, daughter2Id, px, py, pz, e, vx, vy, vz, time);
   p.SetPolarisation(polx, poly, polz);
   p.SetWeight(weight);
   p.SetUniqueID(proc); // using the unique ID to transfer process ID
+  p.SetBit(ParticleStatus::kPrimary, proc == kPPrimary ? 1 : 0); // set primary bit
+  p.SetBit(ParticleStatus::kToBeDone, toBeDone == 1 ? 1 : 0);    // set to be done bit
   mNumberOfEntriesInParticles++;
 
   insertInVector(mTrackIDtoParticlesEntry, trackId, (int)(mParticles.size()));
 
+  handleTransportPrimary(p); // handle selective transport of primary particles
+
   // Push particle on the stack if toBeDone is set
-  if (proc == kPPrimary) {
+  if (p.TestBit(ParticleStatus::kPrimary)) {
     // This is a particle from the primary particle generator
     //
     // SetBit is used to pass information about the primary particle to the stack during transport.
     // Sime particles have already decayed or are partons from a shower. They are needed for the
     // event history in the stack, but not for transport.
     //
+
+    // primary particles might have been pushed with a second creation process
+    // in case we pushed a secondary track of a previous simulation to be continued.
+    // We save therefore in the UniqueID the correct process
+    // while the particle will still be treated as a primary given its bit settings
+    p.SetUniqueID(proc2);
+
     mIndexMap[trackId] = trackId;
-    p.SetBit(ParticleStatus::kKeep);
-    p.SetBit(ParticleStatus::kPrimary);
-    if (toBeDone == 1) {
-      p.SetBit(ParticleStatus::kToBeDone, 1);
+    p.SetBit(ParticleStatus::kKeep, 1);
+    if (p.TestBit(ParticleStatus::kToBeDone)) {
       mNumberOfPrimariesforTracking++;
-    } else {
-      p.SetBit(ParticleStatus::kToBeDone, 0);
     }
     mNumberOfPrimaryParticles++;
     mPrimaryParticles.push_back(p);
     mTracks->emplace_back(p);
   } else {
-    p.SetBit(ParticleStatus::kPrimary, 0);
-    if (toBeDone == 1) {
-      p.SetBit(ParticleStatus::kToBeDone, 1);
-    } else {
-      p.SetBit(ParticleStatus::kToBeDone, 0);
-    }
     mParticles.emplace_back(p);
     mCurrentParticle0 = p;
   }
   mStack.push(p);
+}
+
+void Stack::handleTransportPrimary(TParticle& p)
+{
+  // this function tests whether we really want to transport
+  // this particle and sets the relevant bits accordingly
+
+  if (!p.TestBit(ParticleStatus::kToBeDone) || !p.TestBit(ParticleStatus::kPrimary)) {
+    return;
+  }
+
+  if (!mTransportPrimary(p, mPrimaryParticles)) {
+    p.SetBit(ParticleStatus::kToBeDone, 0);
+    p.SetBit(ParticleStatus::kInhibited, 1);
+  }
 }
 
 void Stack::PushTrack(int toBeDone, TParticle& p)
@@ -219,14 +276,15 @@ void Stack::PushTrack(int toBeDone, TParticle& p)
   // This method is called
   //
   // - during parallel simulation to push primary particles (called by the stack itself)
-  if (p.GetUniqueID() == 0) {
+  if (p.TestBit(ParticleStatus::kPrimary)) {
     // one to one mapping for primaries
     mIndexMap[mNumberOfPrimaryParticles] = mNumberOfPrimaryParticles;
     mNumberOfPrimaryParticles++;
     mPrimaryParticles.push_back(p);
     // Push particle on the stack
-    if (p.TestBit(ParticleStatus::kPrimary) && p.TestBit(ParticleStatus::kToBeDone))
+    if (p.TestBit(ParticleStatus::kToBeDone)) {
       mNumberOfPrimariesforTracking++;
+    }
     mStack.push(p);
     mTracks->emplace_back(p);
   }
@@ -449,8 +507,9 @@ void Stack::FinishPrimary()
   for (Int_t idTrack = imin; idTrack < imax; idTrack++) {
     Int_t index1 = mTrackIDtoParticlesEntry[idTrack];
     Int_t index2 = indicesKept[index1];
-    if (index2 == -1)
+    if (index2 == -1) {
       continue;
+    }
     Int_t index3 = (mIsG4Like) ? invreOrderedIndices[index2] : index2;
     mIndexMap[idTrack] = index3 + indexoffset;
   }
@@ -517,14 +576,6 @@ void Stack::UpdateTrackIndex(TRefArray* detList)
     return a.getTrackID() < b.getTrackID();
   });
 
-  // make final indexed container for track references
-  // fill empty
-  for (auto& ref : *mTrackRefs) {
-    if (ref.getTrackID() >= 0) {
-      mIndexedTrackRefs->addElement(ref.getTrackID(), ref);
-    }
-  }
-
   for (auto det : mActiveDetectors) {
     // update the track indices by delegating to specialized detector functions
     det->updateHitTrackIndices(mIndexMap);
@@ -535,6 +586,7 @@ void Stack::UpdateTrackIndex(TRefArray* detList)
 
 void Stack::Reset()
 {
+
   mIndexOfCurrentTrack = -1;
   mNumberOfPrimaryParticles = mNumberOfEntriesInParticles = mNumberOfEntriesInTracks = 0;
   while (!mStack.empty()) {
@@ -551,7 +603,6 @@ void Stack::Reset()
   mNumberOfPrimariesPopped = 0;
   mPrimaryParticles.clear();
   mTrackRefs->clear();
-  mIndexedTrackRefs->clear();
   mTrackIDtoParticlesEntry.clear();
   mHitCounter = 0;
 }
@@ -560,7 +611,6 @@ void Stack::Register()
 {
   FairRootManager::Instance()->RegisterAny("MCTrack", mTracks, kTRUE);
   FairRootManager::Instance()->RegisterAny("TrackRefs", mTrackRefs, kTRUE);
-  FairRootManager::Instance()->RegisterAny("IndexedTrackRefs", mIndexedTrackRefs, kTRUE);
 }
 
 void Stack::Print(Int_t iVerbose) const
@@ -578,8 +628,9 @@ void Stack::Print(Int_t iVerbose) const
 void Stack::Print(Option_t* option) const
 {
   Int_t verbose = 0;
-  if (option)
+  if (option) {
     verbose = 1;
+  }
   Print(verbose);
 }
 
@@ -697,8 +748,9 @@ bool Stack::selectTracks()
 bool Stack::isPrimary(const MCTrack& part)
 {
   /** check if primary **/
-  if (part.getProcess() == kPPrimary || part.getMotherTrackId() < 0)
+  if (part.getProcess() == kPPrimary || part.getMotherTrackId() < 0) {
     return true;
+  }
   /** not primary **/
   return false;
 }
@@ -709,13 +761,15 @@ bool Stack::isFromPrimaryDecayChain(const MCTrack& part)
       decay chain of a primary particle **/
 
   /** check if from decay **/
-  if (part.getProcess() != kPDecay)
+  if (part.getProcess() != kPDecay) {
     return false;
+  }
   /** check if mother is primary **/
   auto imother = part.getMotherTrackId();
   auto mother = mParticles[imother];
-  if (isPrimary(mother))
+  if (isPrimary(mother)) {
     return true;
+  }
   /** else check if mother is from primary decay **/
   return isFromPrimaryDecayChain(mother);
 }
@@ -727,13 +781,15 @@ bool Stack::isFromPrimaryPairProduction(const MCTrack& part)
       belonging to the primary decay chain **/
 
   /** check if from pair production **/
-  if (part.getProcess() != kPPair)
+  if (part.getProcess() != kPPair) {
     return false;
+  }
   /** check if mother is primary **/
   auto imother = part.getMotherTrackId();
   auto mother = mParticles[imother];
-  if (isPrimary(mother))
+  if (isPrimary(mother)) {
     return true;
+  }
   /** else check if mother is from primary decay **/
   return isFromPrimaryDecayChain(mother);
 }
@@ -745,12 +801,15 @@ bool Stack::keepPhysics(const MCTrack& part)
   // by physics analysis. Decision is put here.
   //
 
-  if (isPrimary(part))
+  if (isPrimary(part)) {
     return true;
-  if (isFromPrimaryDecayChain(part))
+  }
+  if (isFromPrimaryDecayChain(part)) {
     return true;
-  if (isFromPrimaryPairProduction(part))
+  }
+  if (isFromPrimaryPairProduction(part)) {
     return true;
+  }
 
   return false;
 }
@@ -809,8 +868,9 @@ void Stack::ReorderKine(std::vector<MCTrack>& particles, std::vector<int>& reOrd
   int indexoffset = mTracks->size();
   Int_t index = 0;
   Int_t imoOld = 0;
-  for (Int_t i = 0; i < ntr; i++)
+  for (Int_t i = 0; i < ntr; i++) {
     reOrderedIndices[i] = i;
+  }
 
   for (Int_t i = -1; i < ntr; i++) {
     if (i != -1) {

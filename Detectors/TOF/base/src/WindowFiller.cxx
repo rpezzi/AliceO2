@@ -95,14 +95,36 @@ void WindowFiller::reset()
 
   mDigitsPerTimeFrame.clear();
   mReadoutWindowData.clear();
+  mReadoutWindowDataFiltered.clear();
 
-  mFirstOrbit = 0;
-  mFirstBunch = 0;
+  mDigitHeader.clear();
+
+  mFirstIR.bc = 0;
+  mFirstIR.orbit = 0;
 }
+
 //______________________________________________________________________
-void WindowFiller::fillDigitsInStrip(std::vector<Strip>* strips, int channel, int tdc, int tot, int nbc, UInt_t istrip, Int_t triggerorbit, Int_t triggerbunch)
+void WindowFiller::fillDigitsInStrip(std::vector<Strip>* strips, int channel, int tdc, int tot, uint64_t nbc, UInt_t istrip, uint32_t triggerorbit, uint16_t triggerbunch)
 {
   (*strips)[istrip].addDigit(channel, tdc, tot, nbc, 0, triggerorbit, triggerbunch);
+}
+//______________________________________________________________________
+void WindowFiller::addCrateHeaderData(unsigned long orbit, int crate, int32_t bc, uint32_t eventCounter)
+{
+  if (orbit < mFirstIR.orbit) {
+    return;
+  }
+  orbit -= mFirstIR.orbit;
+
+  orbit *= Geo::NWINDOW_IN_ORBIT;          // move from orbit to N readout window
+  orbit += (bc + 100) / Geo::BC_IN_WINDOW; // select readout window in the orbit according to the BC (100 shift to avoid border effects)
+
+  if (mCrateHeaderData.size() < orbit + 1) {
+    mCrateHeaderData.resize(orbit + 1);
+  }
+
+  mCrateHeaderData[orbit].bc[crate] = bc;
+  mCrateHeaderData[orbit].eventCounter[crate] = eventCounter;
 }
 //______________________________________________________________________
 void WindowFiller::fillOutputContainer(std::vector<Digit>& digits)
@@ -120,20 +142,90 @@ void WindowFiller::fillOutputContainer(std::vector<Digit>& digits)
     int first = mDigitsPerTimeFrame.size();
     int ne = digits.size();
     ReadoutWindowData info(first, ne);
-    if (digits.size())
+    int orbit_shift = mReadoutWindowData.size() / Geo::NWINDOW_IN_ORBIT;
+
+    mDigitHeader.addRow();
+
+    int bc_shift = -1;
+    int eventcounter = -1;
+    int ncratesSeen = 0;
+    if (mReadoutWindowData.size() >= mCrateHeaderData.size()) {
+      bc_shift = (mReadoutWindowData.size() % Geo::NWINDOW_IN_ORBIT) * Geo::BC_IN_WINDOW; // insert default value
+      eventcounter = mReadoutWindowData.size() % 4096;
+      for (int icrate = 0; icrate < Geo::kNCrate; icrate++) {
+        info.setEmptyCrate(icrate);
+      }
+    } else {
+      unsigned long irow = mReadoutWindowData.size();
+      for (int icrate = 0; icrate < Geo::kNCrate; icrate++) {
+        if (mCrateHeaderData[irow].bc[icrate] == -1) { // crate not read
+          info.setEmptyCrate(icrate);
+          continue;
+        } else {
+          mDigitHeader.crateSeen(icrate);
+        }
+        ncratesSeen++;
+
+        if (bc_shift == -1 || mCrateHeaderData[irow].bc[icrate] < bc_shift) {
+          bc_shift = mCrateHeaderData[irow].bc[icrate];
+        }
+        if (eventcounter == -1 || mCrateHeaderData[irow].eventCounter[icrate] < eventcounter) {
+          eventcounter = mCrateHeaderData[irow].eventCounter[icrate];
+        }
+      }
+
+      mDigitHeader.numCratesSeen(ncratesSeen);
+
+      if (bc_shift == -1) {
+        bc_shift = (mReadoutWindowData.size() % Geo::NWINDOW_IN_ORBIT) * Geo::BC_IN_WINDOW; // insert default value
+      }
+      if (eventcounter == -1) {
+        eventcounter = mReadoutWindowData.size() % 4096; // insert default value
+      }
+    }
+
+    info.setBCData(mFirstIR.orbit + orbit_shift, mFirstIR.bc + bc_shift);
+    info.setEventCounter(eventcounter);
+    int firstPattern = mPatterns.size();
+    int npatterns = 0;
+
+    // check if patterns are in the current row
+    for (std::vector<PatternData>::reverse_iterator it = mCratePatterns.rbegin(); it != mCratePatterns.rend(); ++it) {
+      if (it->row > mReadoutWindowCurrent) {
+        break;
+      }
+
+      if (it->row < mReadoutWindowCurrent) { // this should not happen
+        LOG(ERROR) << "One pattern skipped because appears to occur early of the current row " << it->row << " < " << mReadoutWindowCurrent << " ?!";
+      } else {
+        mPatterns.push_back(it->pattern);
+        info.addedDiagnostic(it->icrate);
+
+        npatterns++;
+      }
+      mCratePatterns.pop_back();
+    }
+
+    info.setFirstEntryDia(firstPattern);
+    info.setNEntriesDia(npatterns);
+    if (digits.size() || npatterns) {
       mDigitsPerTimeFrame.insert(mDigitsPerTimeFrame.end(), digits.begin(), digits.end());
+      mReadoutWindowDataFiltered.push_back(info);
+    }
     mReadoutWindowData.push_back(info);
   }
 
   // switch to next mStrip after flushing current readout window data
   mIcurrentReadoutWindow++;
-  if (mIcurrentReadoutWindow >= MAXWINDOWS)
+  if (mIcurrentReadoutWindow >= MAXWINDOWS) {
     mIcurrentReadoutWindow = 0;
+  }
   mStripsCurrent = &(mStrips[mIcurrentReadoutWindow]);
   int k = mIcurrentReadoutWindow + 1;
   for (Int_t i = 0; i < MAXWINDOWS - 1; i++) {
-    if (k >= MAXWINDOWS)
+    if (k >= MAXWINDOWS) {
       k = 0;
+    }
     mStripsNext[i] = &(mStrips[k]);
     k++;
   }
@@ -145,20 +237,22 @@ void WindowFiller::flushOutputContainer(std::vector<Digit>& digits)
 { // flush all residual buffered data
   // TO be implemented
 
-  printf("flushOutputContainer\n");
+  // sort patterns (diagnostic words) in time
+  std::sort(mCratePatterns.begin(), mCratePatterns.end(),
+            [](PatternData a, PatternData b) { if(a.row == b.row) { return a.icrate > b.icrate; } else { return a.row > b.row; } });
+
   for (Int_t i = 0; i < MAXWINDOWS; i++) {
     int n = 0;
-    for (int j = 0; j < mStrips[i].size(); j++)
+    for (int j = 0; j < mStrips[i].size(); j++) {
       n += ((mStrips[i])[j]).getNumberOfDigits();
-
-    printf("ro #%d: digits = %d\n", i, n);
+    }
   }
 
-  printf("Future digits = %lu\n", mFutureDigits.size());
+  checkIfReuseFutureDigitsRO();
 
-  if (!mContinuous)
+  if (!mContinuous) {
     fillOutputContainer(digits);
-  else {
+  } else {
     for (Int_t i = 0; i < MAXWINDOWS; i++) {
       fillOutputContainer(digits); // fill all windows which are before (not yet stored) of the new current one
       checkIfReuseFutureDigitsRO();
@@ -174,13 +268,21 @@ void WindowFiller::flushOutputContainer(std::vector<Digit>& digits)
     for (Int_t i = 0; i < MAXWINDOWS; i++) {
       fillOutputContainer(digits); // fill last readout windows
     }
+
+    int nwindowperTF = o2::raw::HBFUtils::Instance().getNOrbitsPerTF() * Geo::NWINDOW_IN_ORBIT;
+
+    // check that all orbits are complete in terms of number of readout windows
+    while ((mReadoutWindowData.size() % nwindowperTF)) {
+      fillOutputContainer(digits); // fill windows without digits to complete all orbits in the last TF
+    }
   }
 }
 //______________________________________________________________________
 void WindowFiller::checkIfReuseFutureDigits()
 {
-  if (!mFutureDigits.size())
+  if (!mFutureDigits.size()) {
     return;
+  }
 
   // check if digits stored very far in future match the new readout windows currently available
   if (mFutureToBeSorted) {
@@ -196,8 +298,9 @@ void WindowFiller::checkIfReuseFutureDigits()
 
   for (std::vector<Digit>::reverse_iterator digit = mFutureDigits.rbegin(); digit != mFutureDigits.rend(); ++digit) {
 
-    if (digit->getBC() > bclimit)
+    if (digit->getBC() > bclimit) {
       break;
+    }
 
     double timestamp = digit->getBC() * Geo::BC_TIME + digit->getTDC() * Geo::TDCBIN * 1E-3; // in ns
     int isnext = Int_t(timestamp * Geo::READOUTWINDOW_INV) - (mReadoutWindowCurrent + 1);    // to be replaced with uncalibrated time
@@ -235,18 +338,21 @@ void WindowFiller::checkIfReuseFutureDigits()
 //______________________________________________________________________
 void WindowFiller::checkIfReuseFutureDigitsRO() // the same but using readout info information from raw
 {
-  if (!mFutureDigits.size())
+  if (!mFutureDigits.size()) {
     return;
+  }
 
   // check if digits stored very far in future match the new readout windows currently available
   if (mFutureToBeSorted) {
     // sort digit in descending BC order: kept last as first
     std::sort(mFutureDigits.begin(), mFutureDigits.end(),
               [](o2::tof::Digit a, o2::tof::Digit b) {
-                if (a.getTriggerOrbit() != b.getTriggerOrbit())
+                if (a.getTriggerOrbit() != b.getTriggerOrbit()) {
                   return a.getTriggerOrbit() > b.getTriggerOrbit();
-                if (a.getTriggerBunch() != b.getTriggerBunch())
+                }
+                if (a.getTriggerBunch() != b.getTriggerBunch()) {
                   return a.getTriggerBunch() > b.getTriggerBunch();
+                }
                 return a.getBC() > b.getBC();
               });
     mFutureToBeSorted = false;
@@ -258,12 +364,13 @@ void WindowFiller::checkIfReuseFutureDigitsRO() // the same but using readout in
 
   for (std::vector<Digit>::reverse_iterator digit = mFutureDigits.rbegin(); digit != mFutureDigits.rend(); ++digit) {
 
-    int row = (digit->getTriggerOrbit() - mFirstOrbit) * Geo::BC_IN_ORBIT + (digit->getTriggerBunch() - mFirstBunch) + 100; // N bunch id of the trigger from timeframe start + 100 bunches
+    int row = (digit->getTriggerOrbit() - mFirstIR.orbit) * Geo::BC_IN_ORBIT + (digit->getTriggerBunch() - mFirstIR.bc) + 100; // N bunch id of the trigger from timeframe start + 100 bunches
 
     row *= Geo::BC_IN_WINDOW_INV;
 
-    if (row > rolimit)
+    if (row > rolimit) {
       break;
+    }
 
     int isnext = row - mReadoutWindowCurrent;
 
@@ -286,7 +393,9 @@ void WindowFiller::checkIfReuseFutureDigitsRO() // the same but using readout in
         strips = mStripsNext[isnext - 1];
       }
 
-      fillDigitsInStrip(strips, digit->getChannel(), digit->getTDC(), digit->getTOT(), digit->getBC(), digit->getChannel() / Geo::NPADS);
+      if (mMaskNoiseRate < 0 || mChannelCounts[digit->getChannel()] < mMaskNoiseRate) {
+        fillDigitsInStrip(strips, digit->getChannel(), digit->getTDC(), digit->getTOT(), digit->getBC(), digit->getChannel() / Geo::NPADS);
+      }
 
       // int labelremoved = digit->getLabel();
       mFutureDigits.erase(mFutureDigits.begin() + idigit);

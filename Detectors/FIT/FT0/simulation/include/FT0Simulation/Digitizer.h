@@ -45,12 +45,15 @@ class Digitizer
 
   void process(const std::vector<o2::ft0::HitType>* hits, std::vector<o2::ft0::Digit>& digitsBC,
                std::vector<o2::ft0::ChannelData>& digitsCh,
+               std::vector<o2::ft0::DetTrigInput>& digitsTrig,
                o2::dataformats::MCTruthContainer<o2::ft0::MCLabel>& label);
   void flush(std::vector<o2::ft0::Digit>& digitsBC,
              std::vector<o2::ft0::ChannelData>& digitsCh,
+             std::vector<o2::ft0::DetTrigInput>& digitsTrig,
              o2::dataformats::MCTruthContainer<o2::ft0::MCLabel>& label);
   void flush_all(std::vector<o2::ft0::Digit>& digitsBC,
                  std::vector<o2::ft0::ChannelData>& digitsCh,
+                 std::vector<o2::ft0::DetTrigInput>& digitsTrig,
                  o2::dataformats::MCTruthContainer<o2::ft0::MCLabel>& label);
   void initParameters();
   void printParameters() const;
@@ -94,8 +97,9 @@ class Digitizer
  protected:
   inline float signalForm(float x) const
   { // table lookup for the signal shape
-    if (x <= 0.0f)
+    if (x <= 0.0f) {
       return 0.0f;
+    }
     float const y = x / mParameters.bunchWidth * DP::SIGNAL_TABLE_SIZE;
     int const index = std::floor(y);
     if (index + 1 >= DP::SIGNAL_TABLE_SIZE) {
@@ -112,8 +116,9 @@ class Digitizer
     auto const rem = y - index;
     Vc::float_v val(0);
     for (size_t i = 0; i < float_v::size(); ++i) {
-      if (y[i] < 0.0f)
+      if (y[i] < 0.0f) {
         continue;
+      }
       if (index[i] + 1 < DP::SIGNAL_TABLE_SIZE) {
         val[i] = mSignalTable[index[i]] + rem[i] * (mSignalTable[index[i] + 1] - mSignalTable[index[i]]);
       } else {
@@ -148,6 +153,7 @@ class Digitizer
   void storeBC(BCCache& bc,
                std::vector<o2::ft0::Digit>& digitsBC,
                std::vector<o2::ft0::ChannelData>& digitsCh,
+               std::vector<o2::ft0::DetTrigInput>& digitsTrig,
                o2::dataformats::MCTruthContainer<o2::ft0::MCLabel>& labels);
 
   ClassDefNV(Digitizer, 1);
@@ -170,8 +176,9 @@ inline float signalForm_integral(float x)
   using namespace std;
   double const a = -0.45458;
   double const b = -0.83344945;
-  if (x < 0)
+  if (x < 0) {
     x = 0;
+  }
   return -(exp(b * x) / b - exp(a * x) / a) / 7.8446501;
 };
 

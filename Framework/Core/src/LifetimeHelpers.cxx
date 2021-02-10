@@ -28,9 +28,7 @@
 using namespace o2::header;
 using namespace fair;
 
-namespace o2
-{
-namespace framework
+namespace o2::framework
 {
 
 namespace
@@ -180,7 +178,7 @@ ExpirationHandler::Handler
   char* err;
   uint64_t overrideTimestampMilliseconds = strtoll(overrideTimestamp.c_str(), &err, 10);
   if (*err != 0) {
-    throw std::runtime_error("fetchFromCCDBCache: Unable to parse forced timestamp for conditions");
+    throw runtime_error("fetchFromCCDBCache: Unable to parse forced timestamp for conditions");
   }
   if (overrideTimestampMilliseconds) {
     LOGP(info, "fetchFromCCDBCache: forcing timestamp for conditions to {} milliseconds from epoch UTC", overrideTimestampMilliseconds);
@@ -199,7 +197,7 @@ ExpirationHandler::Handler
 
     CURL* curl = curl_easy_init();
     if (curl == nullptr) {
-      throw std::runtime_error("fetchFromCCDBCache: Unable to initialise CURL");
+      throw runtime_error("fetchFromCCDBCache: Unable to initialise CURL");
     }
     CURLcode res;
     if (overrideTimestampMilliseconds) {
@@ -216,13 +214,13 @@ ExpirationHandler::Handler
 
     res = curl_easy_perform(curl);
     if (res != CURLE_OK) {
-      throw std::runtime_error(std::string("fetchFromCCDBCache: Unable to fetch ") + url + " from CCDB");
+      throw runtime_error_f("fetchFromCCDBCache: Unable to fetch %s from CCDB", url.c_str());
     }
     long responseCode;
     curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &responseCode);
 
     if (responseCode != 200) {
-      throw std::runtime_error(std::string("fetchFromCCDBCache: HTTP error ") + std::to_string(responseCode) + " while fetching " + url + " from CCDB");
+      throw runtime_error_f("fetchFromCCDBCache: HTTP error %d while fetching %s from CCDB", responseCode, url.c_str());
     }
 
     curl_easy_cleanup(curl);
@@ -254,7 +252,7 @@ ExpirationHandler::Handler
 ExpirationHandler::Handler LifetimeHelpers::fetchFromQARegistry()
 {
   return [](ServiceRegistry&, PartRef& ref, uint64_t) -> void {
-    throw std::runtime_error("fetchFromQARegistry: Not yet implemented");
+    throw runtime_error("fetchFromQARegistry: Not yet implemented");
     return;
   };
 }
@@ -265,7 +263,7 @@ ExpirationHandler::Handler LifetimeHelpers::fetchFromQARegistry()
 ExpirationHandler::Handler LifetimeHelpers::fetchFromObjectRegistry()
 {
   return [](ServiceRegistry&, PartRef& ref, uint64_t) -> void {
-    throw std::runtime_error("fetchFromObjectRegistry: Not yet implemented");
+    throw runtime_error("fetchFromObjectRegistry: Not yet implemented");
     return;
   };
 }
@@ -303,5 +301,34 @@ ExpirationHandler::Handler LifetimeHelpers::enumerate(ConcreteDataMatcher const&
   return f;
 }
 
-} // namespace framework
-} // namespace o2
+/// Create a dummy message with the provided ConcreteDataMatcher
+ExpirationHandler::Handler LifetimeHelpers::dummy(ConcreteDataMatcher const& matcher, std::string const& sourceChannel)
+{
+  using counter_t = int64_t;
+  auto counter = std::make_shared<counter_t>(0);
+  auto f = [matcher, counter, sourceChannel](ServiceRegistry& services, PartRef& ref, uint64_t timestamp) -> void {
+    // We should invoke the handler only once.
+    assert(!ref.header);
+    assert(!ref.payload);
+    auto& rawDeviceService = services.get<RawDeviceService>();
+
+    DataHeader dh;
+    dh.dataOrigin = matcher.origin;
+    dh.dataDescription = matcher.description;
+    dh.subSpecification = matcher.subSpec;
+    dh.payloadSize = 0;
+    dh.payloadSerializationMethod = gSerializationMethodNone;
+
+    DataProcessingHeader dph{timestamp, 1};
+
+    auto&& transport = rawDeviceService.device()->GetChannel(sourceChannel, 0).Transport();
+    auto channelAlloc = o2::pmr::getTransportAllocator(transport);
+    auto header = o2::pmr::getMessage(o2::header::Stack{channelAlloc, dh, dph});
+    ref.header = std::move(header);
+    auto payload = rawDeviceService.device()->NewMessage(0);
+    ref.payload = std::move(payload);
+  };
+  return f;
+}
+
+} // namespace o2::framework

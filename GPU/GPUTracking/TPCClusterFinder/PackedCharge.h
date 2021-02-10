@@ -17,9 +17,7 @@
 #include "clusterFinderDefs.h"
 #include "GPUCommonMath.h"
 
-namespace GPUCA_NAMESPACE
-{
-namespace gpu
+namespace GPUCA_NAMESPACE::gpu
 {
 
 class PackedCharge
@@ -52,12 +50,12 @@ class PackedCharge
   GPUdi() tpccf::Charge unpack() const { return tpccf::Charge(mVal & ChargeMask) / tpccf::Charge(1 << DecimalBits); }
   GPUdi() bool has3x3Peak() const { return mVal & Has3x3PeakMask; }
   GPUdi() bool isSplit() const { return mVal & IsSplitMask; }
+  GPUdi() bool isZero() const { return mVal == 0; }
 
  private:
   BasicType mVal;
 };
 
-} // namespace gpu
-} // namespace GPUCA_NAMESPACE
+} // namespace GPUCA_NAMESPACE::gpu
 
 #endif

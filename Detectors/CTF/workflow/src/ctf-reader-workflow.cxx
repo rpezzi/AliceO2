@@ -22,6 +22,14 @@
 // Specific detectors specs
 #include "ITSMFTWorkflow/EntropyDecoderSpec.h"
 #include "TPCWorkflow/EntropyDecoderSpec.h"
+#include "FT0Workflow/EntropyDecoderSpec.h"
+#include "FV0Workflow/EntropyDecoderSpec.h"
+#include "FDDWorkflow/EntropyDecoderSpec.h"
+#include "TOFWorkflowUtils/EntropyDecoderSpec.h"
+#include "MIDWorkflow/EntropyDecoderSpec.h"
+#include "EMCALWorkflow/EntropyDecoderSpec.h"
+#include "PHOSWorkflow/EntropyDecoderSpec.h"
+#include "CPVWorkflow/EntropyDecoderSpec.h"
 
 using namespace o2::framework;
 using DetID = o2::detectors::DetID;
@@ -44,7 +52,9 @@ void customize(std::vector<o2::framework::ConfigParamSpec>& workflowOptions)
 WorkflowSpec defineDataProcessing(ConfigContext const& configcontext)
 {
   DetID::mask_t dets;
-  std::string inpNames = configcontext.options().get<std::string>("ctf-input");
+  WorkflowSpec specs;
+
+  std::string inpNames;
   if (!configcontext.helpOnCommandLine()) {
     dets.set(); // by default read all
     auto mskOnly = DetID::getMask(configcontext.options().get<std::string>("onlyDet"));
@@ -54,11 +64,11 @@ WorkflowSpec defineDataProcessing(ConfigContext const& configcontext)
     } else {
       dets ^= mskSkip;
     }
-  } else if (inpNames.empty()) {
-    throw std::runtime_error("--ctf-input <file,...> is not provided");
+    if ((inpNames = configcontext.options().get<std::string>("ctf-input")).empty()) {
+      throw std::runtime_error("--ctf-input <file,...> is not provided");
+    }
   }
 
-  WorkflowSpec specs;
   specs.push_back(o2::ctf::getCTFReaderSpec(dets, inpNames));
   // add decodors for all allowed detectors.
   if (dets[DetID::ITS]) {
@@ -69,6 +79,30 @@ WorkflowSpec defineDataProcessing(ConfigContext const& configcontext)
   }
   if (dets[DetID::TPC]) {
     specs.push_back(o2::tpc::getEntropyDecoderSpec());
+  }
+  if (dets[DetID::TOF]) {
+    specs.push_back(o2::tof::getEntropyDecoderSpec());
+  }
+  if (dets[DetID::FT0]) {
+    specs.push_back(o2::ft0::getEntropyDecoderSpec());
+  }
+  if (dets[DetID::FV0]) {
+    specs.push_back(o2::fv0::getEntropyDecoderSpec());
+  }
+  if (dets[DetID::FDD]) {
+    specs.push_back(o2::fdd::getEntropyDecoderSpec());
+  }
+  if (dets[DetID::MID]) {
+    specs.push_back(o2::mid::getEntropyDecoderSpec());
+  }
+  if (dets[DetID::EMC]) {
+    specs.push_back(o2::emcal::getEntropyDecoderSpec());
+  }
+  if (dets[DetID::PHS]) {
+    specs.push_back(o2::phos::getEntropyDecoderSpec());
+  }
+  if (dets[DetID::CPV]) {
+    specs.push_back(o2::cpv::getEntropyDecoderSpec());
   }
 
   return std::move(specs);

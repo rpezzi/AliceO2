@@ -16,8 +16,6 @@
 #ifndef ALICEOW_GPUCOMMON_TPCFASTTRANSFORMATION_FLATOBJECT_H
 #define ALICEOW_GPUCOMMON_TPCFASTTRANSFORMATION_FLATOBJECT_H
 
-#undef NDEBUG
-
 #if !defined(GPUCA_GPUCODE_DEVICE)
 #include <cstddef>
 #include <memory>
@@ -318,7 +316,9 @@ class FlatObject
   char* mFlatBufferContainer = nullptr;                               //[mFlatBufferSize]  Optional container for the flat buffer
   char* mFlatBufferPtr = nullptr;                                     //!  Pointer to the flat buffer
 
+#ifndef GPUCA_ALIROOT_LIB
   ClassDefNV(FlatObject, 1);
+#endif
 };
 
 /// ========================================================================================================
@@ -386,30 +386,7 @@ inline void FlatObject::cloneFromObject(const FlatObject& obj, char* newFlatBuff
   std::memcpy(mFlatBufferPtr, obj.mFlatBufferPtr, obj.mFlatBufferSize);
   mConstructionMask = (unsigned int)ConstructionState::Constructed;
 }
-#endif
 
-inline char* FlatObject::releaseInternalBuffer()
-{
-  // returns an pointer to the internal buffer. Makes the internal container variable empty.
-  char* contPtr = mFlatBufferContainer;
-  mFlatBufferContainer = nullptr;
-  return contPtr;
-}
-
-inline void FlatObject::adoptInternalBuffer(char* buf)
-{
-  // buf becomes the new internal buffer, after it was already set as new setActualBufferAddress
-  assert((mFlatBufferPtr == buf));
-  mFlatBufferContainer = buf;
-}
-
-inline void FlatObject::clearInternalBufferPtr()
-{
-  // we just release the internal buffer ressetting it to nullptr
-  mFlatBufferContainer = nullptr;
-}
-
-#ifndef GPUCA_GPUCODE // code invisible on GPU
 inline void FlatObject::moveBufferTo(char* newFlatBufferPtr)
 {
   /// sets buffer pointer to the new address, move the buffer content there.
@@ -423,32 +400,74 @@ inline void FlatObject::moveBufferTo(char* newFlatBufferPtr)
     mFlatBufferContainer = mFlatBufferPtr;
   }
 }
-#endif
 
-inline void FlatObject::setActualBufferAddress(char* actualFlatBufferPtr)
+template <class T>
+inline std::string FlatObject::stressTest(T& obj)
 {
-  /// Sets the actual location of the external flat buffer after it has been moved (i.e. to another maschine)
+  /// Test the flat object functionality for an object of a child class T
+  /// the obj is modified here. Check if it is functional after the test.
   ///
-  /// It sets  mFlatBufferPtr to actualFlatBufferPtr.
-  /// A daughter class should update all the pointers inside the buffer in the new location.
+  std::string err;
 
-  mFlatBufferPtr = actualFlatBufferPtr;
+  if (!obj.isConstructed()) {
+    return "tested object is not constructed!";
+  }
+
+  T tst;
+  tst.cloneFromObject(obj, nullptr);
+  if (!tst.isConstructed() || !tst.isBufferInternal()) {
+    return "error at cloneFromObject()!";
+  }
+
+  obj.destroy();
+
+  char* buf0 = tst.releaseInternalBuffer();
+  char* buf1 = new char[tst.getFlatBufferSize()];
+  char* buf2 = new char[tst.getFlatBufferSize()];
+  std::memcpy(buf1, tst.getFlatBufferPtr(), tst.getFlatBufferSize());
+  tst.setActualBufferAddress(buf1);
+  delete[] buf0;
+
+  tst.setFutureBufferAddress(buf2);
+  std::memcpy(buf2, buf1, tst.getFlatBufferSize());
+  delete[] buf1;
+
+  if (tst.isBufferInternal()) {
+    return err = "error, buffer should be external!";
+  }
+
+  tst.adoptInternalBuffer(buf2);
+  if (!tst.isBufferInternal()) {
+    return err = "error, buffer should be internal!";
+  }
+
+  obj.cloneFromObject(tst, nullptr);
+  if (!obj.isBufferInternal()) {
+    return err = "error, buffer should be internal!";
+  }
+
+  return err;
 }
 
-inline void FlatObject::setFutureBufferAddress(char* futureFlatBufferPtr)
+inline void FlatObject::printC() const
 {
-  /// Sets a future location of the external flat buffer before moving it to this location.
-  ///
-  /// A daughter class should already reset all the pointers inside the current buffer to the future location
-  /// without touching memory in the future location.
-
-  assert(!isBufferInternal());
-  mFlatBufferPtr = futureFlatBufferPtr;
-#ifndef GPUCA_GPUCODE            // code invisible on GPU
-  delete[] mFlatBufferContainer; // for a case..
-#endif                           // !GPUCA_GPUCODE
-  mFlatBufferContainer = nullptr;
+  /// Print the content of the flat buffer
+  bool lfdone = false;
+  for (int i = 0; i < mFlatBufferSize; i++) {
+    unsigned char v = mFlatBufferPtr[i];
+    lfdone = false;
+    printf("0x%02x ", v);
+    if (i && ((i + 1) % 20) == 0) {
+      printf("\n");
+      lfdone = true;
+    }
+  }
+  if (!lfdone) {
+    printf("\n");
+  }
 }
+
+#endif // GPUCA_GPUCODE
 
 #if !defined(GPUCA_GPUCODE) && !defined(GPUCA_STANDALONE) // code invisible on GPU
 template <class T, class TFile>
@@ -494,72 +513,57 @@ inline T* FlatObject::readFromFile(TFile& inpf, const char* name)
   pobj->setActualBufferAddress(pobj->mFlatBufferContainer);
   return pobj;
 }
-#endif
+#endif // GPUCA_GPUCODE || GPUCA_STANDALONE
 
-#if !defined(GPUCA_GPUCODE) // code invisible on GPU
+#ifndef GPUCA_GPUCODE_DEVICE
 
-template <class T>
-inline std::string FlatObject::stressTest(T& obj)
+inline char* FlatObject::releaseInternalBuffer()
 {
-  /// Test the flat object functionality for an object of a child class T
-  /// the obj is modified here. Check if it is functional after the test.
+  // returns an pointer to the internal buffer. Makes the internal container variable empty.
+  char* contPtr = mFlatBufferContainer;
+  mFlatBufferContainer = nullptr;
+  return contPtr;
+}
+
+inline void FlatObject::adoptInternalBuffer(char* buf)
+{
+  // buf becomes the new internal buffer, after it was already set as new setActualBufferAddress
+  assert((mFlatBufferPtr == buf));
+  mFlatBufferContainer = buf;
+}
+
+inline void FlatObject::clearInternalBufferPtr()
+{
+  // we just release the internal buffer ressetting it to nullptr
+  mFlatBufferContainer = nullptr;
+}
+
+inline void FlatObject::setActualBufferAddress(char* actualFlatBufferPtr)
+{
+  /// Sets the actual location of the external flat buffer after it has been moved (i.e. to another maschine)
   ///
-  std::string err;
+  /// It sets  mFlatBufferPtr to actualFlatBufferPtr.
+  /// A daughter class should update all the pointers inside the buffer in the new location.
 
-  if (!obj.isConstructed())
-    return "tested object is not constructed!";
-
-  T tst;
-  tst.cloneFromObject(obj, nullptr);
-  if (!tst.isConstructed() || !tst.isBufferInternal())
-    return "error at cloneFromObject()!";
-
-  obj.destroy();
-
-  char* buf0 = tst.releaseInternalBuffer();
-  char* buf1 = new char[tst.getFlatBufferSize()];
-  char* buf2 = new char[tst.getFlatBufferSize()];
-  std::memcpy(buf1, tst.getFlatBufferPtr(), tst.getFlatBufferSize());
-  tst.setActualBufferAddress(buf1);
-  delete[] buf0;
-
-  tst.setFutureBufferAddress(buf2);
-  std::memcpy(buf2, buf1, tst.getFlatBufferSize());
-  delete[] buf1;
-
-  if (tst.isBufferInternal())
-    return err = "error, buffer should be external!";
-
-  tst.adoptInternalBuffer(buf2);
-  if (!tst.isBufferInternal())
-    return err = "error, buffer should be internal!";
-
-  obj.cloneFromObject(tst, nullptr);
-  if (!obj.isBufferInternal())
-    return err = "error, buffer should be internal!";
-
-  return err;
+  mFlatBufferPtr = actualFlatBufferPtr;
 }
 
-inline void FlatObject::printC() const
+inline void FlatObject::setFutureBufferAddress(char* futureFlatBufferPtr)
 {
-  /// Print the content of the flat buffer
-  bool lfdone = false;
-  for (int i = 0; i < mFlatBufferSize; i++) {
-    unsigned char v = mFlatBufferPtr[i];
-    lfdone = false;
-    printf("0x%02x ", v);
-    if (i && ((i + 1) % 20) == 0) {
-      printf("\n");
-      lfdone = true;
-    }
-  }
-  if (!lfdone) {
-    printf("\n");
-  }
+  /// Sets a future location of the external flat buffer before moving it to this location.
+  ///
+  /// A daughter class should already reset all the pointers inside the current buffer to the future location
+  /// without touching memory in the future location.
+
+  assert(!isBufferInternal());
+  mFlatBufferPtr = futureFlatBufferPtr;
+#ifndef GPUCA_GPUCODE            // code invisible on GPU
+  delete[] mFlatBufferContainer; // for a case..
+#endif                           // !GPUCA_GPUCODE
+  mFlatBufferContainer = nullptr;
 }
 
-#endif // GPUCA_GPUCODE
+#endif //GPUCA_GPUCODE_DEVICE
 
 } // namespace gpu
 } // namespace GPUCA_NAMESPACE

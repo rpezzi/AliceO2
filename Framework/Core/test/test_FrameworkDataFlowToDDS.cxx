@@ -11,6 +11,7 @@
 #define BOOST_TEST_MAIN
 #define BOOST_TEST_DYN_LINK
 
+#include "Mocking.h"
 #include <boost/test/unit_test.hpp>
 #include "../src/DDSConfigHelpers.h"
 #include "../src/DeviceSpecHelpers.h"
@@ -69,7 +70,8 @@ BOOST_AUTO_TEST_CASE(TestDDS)
 {
   auto workflow = defineDataProcessing();
   std::ostringstream ss{""};
-  auto channelPolicies = ChannelConfigurationPolicy::createDefaultPolicies();
+  auto configContext = makeEmptyConfigContext();
+  auto channelPolicies = ChannelConfigurationPolicy::createDefaultPolicies(*configContext);
   std::vector<DeviceSpec> devices;
   std::vector<ComputingResource> resources{ComputingResourceHelpers::getLocalhostResource()};
   SimpleResourceManager rm(resources);
@@ -90,23 +92,23 @@ BOOST_AUTO_TEST_CASE(TestDDS)
       {"C", "foo", {}, workflowOptions},
       {"D", "foo", {}, workflowOptions},
     }};
-  DeviceSpecHelpers::prepareArguments(false, false,
+  DeviceSpecHelpers::prepareArguments(false, false, 8080,
                                       dataProcessorInfos,
                                       devices, executions, controls,
                                       "workflow-id");
   dumpDeviceSpec2DDS(ss, devices, executions);
   BOOST_CHECK_EQUAL(ss.str(), R"EXPECTED(<topology name="o2-dataflow">
    <decltask name="A">
-       <exe reachable="true">foo --id A --control static --shm-monitor false --log-color false --color false --jobs 4 --severity info --session dpl_workflow-id --plugin-search-path $FAIRMQ_ROOT/lib --plugin dds</exe>
+       <exe reachable="true">foo --id A --control static --shm-monitor false --log-color false --color false --jobs 4 --severity info --shm-mlock-segment false --shm-segment-id 0 --shm-throw-bad-alloc true --shm-zero-segment false --stacktrace-on-signal all --session dpl_workflow-id --plugin-search-path $FAIRMQ_ROOT/lib --plugin dds</exe>
    </decltask>
    <decltask name="B">
-       <exe reachable="true">foo --id B --control static --shm-monitor false --log-color false --color false --jobs 4 --severity info --session dpl_workflow-id --plugin-search-path $FAIRMQ_ROOT/lib --plugin dds</exe>
+       <exe reachable="true">foo --id B --control static --shm-monitor false --log-color false --color false --jobs 4 --severity info --shm-mlock-segment false --shm-segment-id 0 --shm-throw-bad-alloc true --shm-zero-segment false --stacktrace-on-signal all --session dpl_workflow-id --plugin-search-path $FAIRMQ_ROOT/lib --plugin dds</exe>
    </decltask>
    <decltask name="C">
-       <exe reachable="true">foo --id C --control static --shm-monitor false --log-color false --color false --jobs 4 --severity info --session dpl_workflow-id --plugin-search-path $FAIRMQ_ROOT/lib --plugin dds</exe>
+       <exe reachable="true">foo --id C --control static --shm-monitor false --log-color false --color false --jobs 4 --severity info --shm-mlock-segment false --shm-segment-id 0 --shm-throw-bad-alloc true --shm-zero-segment false --stacktrace-on-signal all --session dpl_workflow-id --plugin-search-path $FAIRMQ_ROOT/lib --plugin dds</exe>
    </decltask>
    <decltask name="D">
-       <exe reachable="true">foo --id D --control static --shm-monitor false --log-color false --color false --jobs 4 --severity info --session dpl_workflow-id --plugin-search-path $FAIRMQ_ROOT/lib --plugin dds</exe>
+       <exe reachable="true">foo --id D --control static --shm-monitor false --log-color false --color false --jobs 4 --severity info --shm-mlock-segment false --shm-segment-id 0 --shm-throw-bad-alloc true --shm-zero-segment false --stacktrace-on-signal all --session dpl_workflow-id --plugin-search-path $FAIRMQ_ROOT/lib --plugin dds</exe>
    </decltask>
    <declcollection name="DPL">
        <tasks>

@@ -15,7 +15,7 @@
 #include <TFile.h>
 #include <iostream>
 #include <numeric> // for iota
-#include <MathUtils/Cartesian3D.h>
+#include <MathUtils/Cartesian.h>
 
 using namespace o2::steer;
 
@@ -119,14 +119,14 @@ bool DigitizationContext::checkVertexCompatibility(bool verbose) const
     return true;
   }
 
-  auto checkVertexPair = [](Point3D<double> const& p1, Point3D<double> const& p2) -> bool {
+  auto checkVertexPair = [](math_utils::Point3D<double> const& p1, math_utils::Point3D<double> const& p2) -> bool {
     return (p2 - p1).Mag2() < 1E-6;
   };
 
   std::vector<TChain*> kinematicschain;
   std::vector<TBranch*> headerbranches;
   std::vector<o2::dataformats::MCEventHeader*> headers;
-  std::vector<Point3D<double>> vertices;
+  std::vector<math_utils::Point3D<double>> vertices;
   initSimKinematicsChains(kinematicschain);
   bool consistent = true;
   if (kinematicschain.size() > 0) {
@@ -212,7 +212,7 @@ void DigitizationContext::fillQED(std::string_view QEDprefix, std::vector<o2::In
   auto t = (TTree*)f.Get("o2sim");
   if (!t) {
     LOG(ERROR) << "No QED kinematics found";
-    return;
+    throw std::runtime_error("No QED kinematics found");
   }
   auto numberQEDevents = t->GetEntries();
   int eventID = 0;

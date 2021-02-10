@@ -53,6 +53,10 @@ if (DPL_TESTS_BATCH_MODE)
   set(DPL_WORKFLOW_TESTS_EXTRA_OPTIONS -b)
 endif()
 
+if (DPL_ENABLE_TRACING)
+  add_definitions(-DDPL_ENABLE_TRACING)
+endif()
+
 # include macros and functions that are used in the following subdirectories'
 # CMakeLists.txt
 include(O2AddExecutable)
@@ -60,10 +64,12 @@ include(O2AddHeaderOnlyLibrary)
 include(O2AddLibrary)
 include(O2AddTest)
 include(O2AddTestRootMacro)
+include(O2ReportNonTestedMacros)
 include(O2TargetRootDictionary)
 include(O2DataFile)
 include(O2TargetManPage)
 include(O2AddWorkflow)
+include(O2SetROOTPCMDependencies)
 
 # Main targets of the project in various subdirectories. Order matters.
 add_subdirectory(Common)
@@ -78,7 +84,9 @@ add_subdirectory(EventVisualisation)
 add_subdirectory(Generators)
 add_subdirectory(Steer) # consider building this only for simulation ?
 add_subdirectory(prodtests)
+if(BUILD_ANALYSIS)
 add_subdirectory(Analysis)
+endif()
 add_subdirectory(scripts)
 
 if(BUILD_EXAMPLES)
@@ -104,9 +112,9 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
   endif()
   if(BUILD_TEST_ROOT_MACROS)
     add_subdirectory(macro)
-    include(O2ReportNonTestedMacros)
     o2_report_non_tested_macros()
   endif()
   add_subdirectory(packaging)
-
 endif()
+
+set_root_pcm_dependencies()

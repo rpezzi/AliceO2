@@ -10,8 +10,8 @@
 #include "Framework/runDataProcessing.h"
 #include "Framework/AnalysisTask.h"
 #include "Framework/AnalysisDataModel.h"
-#include "Analysis/EventSelection.h"
-#include "Analysis/Centrality.h"
+#include "AnalysisDataModel/EventSelection.h"
+#include "AnalysisDataModel/Centrality.h"
 #include "TH1F.h"
 
 using namespace o2;
@@ -21,10 +21,12 @@ struct CentralityQaTask {
   OutputObj<TH1F> hCentV0M{TH1F("hCentV0M", "", 21, 0, 105.)};
   void process(soa::Join<aod::Collisions, aod::EvSels, aod::Cents>::iterator const& col)
   {
-    if (!col.alias()[kINT7])
+    if (!col.alias()[kINT7]) {
       return;
-    if (!col.sel7())
+    }
+    if (!col.sel7()) {
       return;
+    }
 
     LOGF(debug, "centV0M=%.0f", col.centV0M());
     // fill centrality histos

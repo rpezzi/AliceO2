@@ -33,7 +33,7 @@ Strip::Strip(Int_t index)
 {
 }
 //_______________________________________________________________________
-Int_t Strip::addDigit(Int_t channel, Int_t tdc, Int_t tot, Int_t bc, Int_t lbl, Int_t triggerorbit, Int_t triggerbunch)
+Int_t Strip::addDigit(Int_t channel, Int_t tdc, Int_t tot, uint64_t bc, Int_t lbl, uint32_t triggerorbit, uint16_t triggerbunch)
 {
 
   // return the MC label. We pass it also as argument, but it can change in
@@ -59,8 +59,9 @@ void Strip::fillOutputContainer(std::vector<Digit>& digits)
   // we assume that the Strip has stored inside only digits from one readout
   // window --> we flush them all
 
-  if (mDigits.empty())
+  if (mDigits.empty()) {
     return;
+  }
   auto itBeg = mDigits.begin();
   auto iter = itBeg;
   for (; iter != mDigits.end(); ++iter) {

@@ -43,7 +43,7 @@ void CheckDigits_mft(Int_t nEvents = 1, Int_t nMuons = 10, TString mcEngine = "T
   gFile->Get("FairGeoParSet");
 
   auto* gman = o2::mft::GeometryTGeo::Instance();
-  gman->fillMatrixCache(o2::utils::bit2Mask(o2::TransformType::L2G));
+  gman->fillMatrixCache(o2::math_utils::bit2Mask(o2::math_utils::TransformType::L2G));
 
   SegmentationAlpide seg;
 
@@ -83,7 +83,7 @@ void CheckDigits_mft(Int_t nEvents = 1, Int_t nMuons = 10, TString mcEngine = "T
       Int_t ix = d->getRow(), iz = d->getColumn();
       Float_t x = 0.f, z = 0.f;
       seg.detectorToLocal(ix, iz, x, z);
-      const Point3D<Float_t> locD(x, 0., z);
+      const o2::math_utils::Point3D<Float_t> locD(x, 0., z);
 
       const auto& labs = labels->getLabels(nd);
 
@@ -106,7 +106,7 @@ void CheckDigits_mft(Int_t nEvents = 1, Int_t nMuons = 10, TString mcEngine = "T
         for (auto& p : *hitArray) {
           if (p.GetDetectorID() != (Short_t)chipID)
             continue;
-          if (p.GetTrackID() != (Int_t)lab)
+          if (p.GetTrackID() != lab.getTrackID())
             continue;
 
           auto locH = gman->getMatrixL2G(chipID) ^ (p.GetPos());         // inverse conversion from global to local

@@ -43,6 +43,7 @@ class Geo
   static void getPos(Int_t* det, Float_t* pos);
   static void getVolumePath(const Int_t* ind, Char_t* path);
   static Int_t getStripNumberPerSM(Int_t iplate, Int_t istrip);
+  static void getStripAndModule(Int_t iStripPerSM, Int_t& iplate, Int_t& istrip); // Return the module and strip per module corresponding to the strip number per SM
 
   static Float_t getAngles(Int_t iplate, Int_t istrip) { return ANGLES[iplate][istrip]; }
   static Float_t getHeights(Int_t iplate, Int_t istrip) { return HEIGHTS[iplate][istrip]; }
@@ -62,10 +63,10 @@ class Geo
 
   static constexpr Int_t RAW_PAGE_MAX_SIZE = 8192;
 
-  static constexpr Float_t BC_TIME = o2::constants::lhc::LHCBunchSpacingNS; // bunch crossing in ns
-  static constexpr Float_t BC_TIME_INV = 1. / BC_TIME;                      // inv bunch crossing in ns
-  static constexpr Float_t BC_TIME_INPS = BC_TIME * 1000;                   // bunch crossing in ps
-  static constexpr Float_t BC_TIME_INPS_INV = 1. / BC_TIME_INPS;            // inv bunch crossing in ps
+  static constexpr Double_t BC_TIME = o2::constants::lhc::LHCBunchSpacingNS; // bunch crossing in ns
+  static constexpr Double_t BC_TIME_INV = 1. / BC_TIME;                      // inv bunch crossing in ns
+  static constexpr Double_t BC_TIME_INPS = BC_TIME * 1000;                   // bunch crossing in ps
+  static constexpr Double_t BC_TIME_INPS_INV = 1. / BC_TIME_INPS;            // inv bunch crossing in ps
   static constexpr int BC_IN_ORBIT = o2::constants::lhc::LHCMaxBunches;     // N. bunch crossing in 1 orbit
 
   static constexpr Int_t NPADX = 48;

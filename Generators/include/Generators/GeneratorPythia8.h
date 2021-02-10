@@ -38,14 +38,44 @@ class GeneratorPythia8 : public Generator
   /** Initialize the generator if needed **/
   Bool_t Init() override;
 
+  /** methods to override **/
+  Bool_t generateEvent() override;
+  Bool_t importParticles() override { return importParticles(mPythia.event); };
+
   /** setters **/
   void setConfig(std::string val) { mConfig = val; };
   void setHooksFileName(std::string val) { mHooksFileName = val; };
   void setHooksFuncName(std::string val) { mHooksFuncName = val; };
+  void setUserHooks(Pythia8::UserHooks* hooks)
+  {
+#if PYTHIA_VERSION_INTEGER < 8300
+    mPythia.setUserHooksPtr(hooks);
+#else
+    mPythia.setUserHooksPtr(std::shared_ptr<Pythia8::UserHooks>(hooks));
+#endif
+  }
 
   /** methods **/
   bool readString(std::string val) { return mPythia.readString(val, true); };
   bool readFile(std::string val) { return mPythia.readFile(val, true); };
+
+  /** utilities **/
+  void getNcoll(int& nColl)
+  {
+    getNcoll(mPythia.info, nColl);
+  };
+  void getNpart(int& nPart)
+  {
+    getNpart(mPythia.info, nPart);
+  };
+  void getNpart(int& nProtonProj, int& nNeutronProj, int& nProtonTarg, int& nNeutronTarg)
+  {
+    getNpart(mPythia.info, nProtonProj, nNeutronProj, nProtonTarg, nNeutronTarg);
+  };
+  void getNremn(int& nProtonProj, int& nNeutronProj, int& nProtonTarg, int& nNeutronTarg)
+  {
+    getNremn(mPythia.event, nProtonProj, nNeutronProj, nProtonTarg, nNeutronTarg);
+  };
 
  protected:
   /** copy constructor **/
@@ -53,12 +83,18 @@ class GeneratorPythia8 : public Generator
   /** operator= **/
   GeneratorPythia8& operator=(const GeneratorPythia8&);
 
-  /** methods to override **/
-  Bool_t generateEvent() override;
-  Bool_t importParticles() override;
-
   /** methods that can be overridded **/
-  void updateHeader(FairMCEventHeader* eventHeader) override;
+  void updateHeader(o2::dataformats::MCEventHeader* eventHeader) override;
+
+  /** internal methods **/
+  Bool_t importParticles(Pythia8::Event& event);
+
+  /** utilities **/
+  void selectFromAncestor(int ancestor, Pythia8::Event& inputEvent, Pythia8::Event& outputEvent);
+  void getNcoll(const Pythia8::Info& info, int& nColl);
+  void getNpart(const Pythia8::Info& info, int& nPart);
+  void getNpart(const Pythia8::Info& info, int& nProtonProj, int& nNeutronProj, int& nProtonTarg, int& nNeutronTarg);
+  void getNremn(const Pythia8::Event& event, int& nProtonProj, int& nNeutronProj, int& nProtonTarg, int& nNeutronTarg);
 
   /** Pythia8 **/
   Pythia8::Pythia mPythia; //!

@@ -38,21 +38,28 @@ void DecayerPythia8::Init()
   auto& param = DecayerPythia8Param::Instance();
   LOG(INFO) << "Init \'DecayerPythia8\' with following parameters";
   LOG(INFO) << param;
-  if (!param.config.empty()) {
-    std::stringstream ss(param.config);
-    std::string config;
-    while (getline(ss, config, ' ')) {
-      config = gSystem->ExpandPathName(config.c_str());
-      if (!mPythia.readFile(config, true)) {
-        LOG(FATAL) << "Failed to init \'DecayerPythia8\': problems with configuration file "
-                   << config;
-        return;
-      }
+  for (int i = 0; i < 8; ++i) {
+    if (param.config[i].empty()) {
+      continue;
+    }
+    std::string config = gSystem->ExpandPathName(param.config[i].c_str());
+    LOG(INFO) << "Reading configuration from file: " << config;
+    if (!mPythia.readFile(config, true)) {
+      LOG(FATAL) << "Failed to init \'DecayerPythia8\': problems with configuration file "
+                 << config;
+      return;
     }
   }
 
   /** verbose flag **/
   mVerbose = param.verbose;
+
+  /** show changed particle data **/
+  if (param.showChanged) {
+    mPythia.readString(std::string("Init:showChangedParticleData on"));
+  } else {
+    mPythia.readString(std::string("Init:showChangedParticleData off"));
+  }
 
   /** initialise **/
   if (!mPythia.init()) {
@@ -71,8 +78,9 @@ void DecayerPythia8::Decay(Int_t pdg, TLorentzVector* lv)
   mPythia.event.clear();
   mPythia.event.append(pdg, 11, 0, 0, lv->Px(), lv->Py(), lv->Pz(), lv->E(), lv->M());
   mPythia.moreDecays();
-  if (mVerbose)
+  if (mVerbose) {
     mPythia.event.list();
+  }
 
   mPythia.particleData.mayDecay(pdg, mayDecay); // restore mayDecay status
 }

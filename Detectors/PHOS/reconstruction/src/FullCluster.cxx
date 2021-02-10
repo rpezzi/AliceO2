@@ -180,10 +180,11 @@ void FullCluster::evalDispersion()
     mDispersion /= wtot;
   }
 
-  if (mDispersion >= 0)
+  if (mDispersion >= 0) {
     mDispersion = std::sqrt(mDispersion);
-  else
+  } else {
     mDispersion = 0.;
+  }
 }
 //____________________________________________________________________________
 void FullCluster::evalElipsAxis()
@@ -219,14 +220,16 @@ void FullCluster::evalElipsAxis()
     dxz -= x * z;
 
     mLambdaLong = 0.5 * (dxx + dzz) + std::sqrt(0.25 * (dxx - dzz) * (dxx - dzz) + dxz * dxz);
-    if (mLambdaLong > 0)
+    if (mLambdaLong > 0) {
       mLambdaLong = std::sqrt(mLambdaLong);
+    }
 
     mLambdaShort = 0.5 * (dxx + dzz) - std::sqrt(0.25 * (dxx - dzz) * (dxx - dzz) + dxz * dxz);
-    if (mLambdaShort > 0) // To avoid exception if numerical errors lead to negative lambda.
+    if (mLambdaShort > 0) { // To avoid exception if numerical errors lead to negative lambda.
       mLambdaShort = std::sqrt(mLambdaShort);
-    else
+    } else {
       mLambdaShort = 0.;
+    }
   } else {
     mLambdaLong = mLambdaShort = 0.;
   }
@@ -325,4 +328,16 @@ char FullCluster::getNumberOfLocalMax(gsl::span<int> maxAt) const
   }
 
   return iDigitN;
+}
+
+//____________________________________________________________________________
+void FullCluster::reset()
+{
+  //clean up everething
+  mElementList.clear();
+  mFullEnergy = 0.;
+  mCoreEnergy = 0.;
+  mMulDigit = 0;
+  mNExMax = -1;
+  //other cluster parameters will be re-calculated
 }

@@ -305,16 +305,19 @@ struct Descriptor {
   {
     char* target = str;
     char* targetEnd = target;
-    if (length >= 0 && length < (int)N)
+    if (length >= 0 && length < (int)N) {
       targetEnd += length;
-    else
+    } else {
       targetEnd += N;
+    }
     const char* source = string;
-    for (; source != nullptr && target < targetEnd && *source != 0; ++target, ++source)
+    for (; source != nullptr && target < targetEnd && *source != 0; ++target, ++source) {
       *target = *source;
+    }
     targetEnd = str + N;
-    for (; target < targetEnd; ++target)
+    for (; target < targetEnd; ++target) {
       *target = 0;
+    }
     // require the string to be not longer than the descriptor size
     if (source != nullptr && (*source == 0 || (length >= 0 && length <= (int)N))) {
     } else {
@@ -634,7 +637,9 @@ constexpr o2::header::DataOrigin gDataOriginTRD{"TRD"};
 constexpr o2::header::DataOrigin gDataOriginZDC{"ZDC"};
 #ifdef ENABLE_UPGRADES
 constexpr o2::header::DataOrigin gDataOriginIT3{"IT3"};
+constexpr o2::header::DataOrigin gDataOriginTRK{"TRK"};
 constexpr o2::header::DataOrigin gDataOriginEC0{"EC0"};
+
 #endif
 
 //possible data types
@@ -667,9 +672,11 @@ struct DataHeader : public BaseHeader {
   using SplitPayloadPartsType = uint32_t;
   using PayloadSizeType = uint64_t;
   using TForbitType = uint32_t;
+  using TFCounterType = uint32_t;
+  using RunNumberType = uint32_t;
 
   //static data for this header type/version
-  static constexpr uint32_t sVersion{2};
+  static constexpr uint32_t sVersion{3};
   static constexpr o2::header::HeaderType sHeaderType{String2<uint64_t>("DataHead")};
   static constexpr o2::header::SerializationMethod sSerializationMethod{gSerializationMethodNone};
 
@@ -712,9 +719,19 @@ struct DataHeader : public BaseHeader {
   //___NEW STUFF GOES BELOW
 
   ///
-  /// first orbit of time frame as unique identifier within the run
+  /// first orbit of time frame, since v2
   ///
   TForbitType firstTForbit;
+
+  ///
+  /// ever incrementing TF counter, allows to disentangle even TFs with same firstTForbit in case of replay, since v3
+  ///
+  TFCounterType tfCounter;
+
+  ///
+  /// run number TF belongs to, since v3
+  ///
+  RunNumberType runNumber;
 
   //___the functions:
   //__________________________________________________________________________________________________
@@ -727,7 +744,9 @@ struct DataHeader : public BaseHeader {
       subSpecification(0),
       splitPayloadIndex(0),
       payloadSize(0),
-      firstTForbit{0}
+      firstTForbit{0},
+      tfCounter(0),
+      runNumber(0)
   {
   }
 
@@ -741,7 +760,9 @@ struct DataHeader : public BaseHeader {
       subSpecification(subspec),
       splitPayloadIndex(0),
       payloadSize(size),
-      firstTForbit{0}
+      firstTForbit{0},
+      tfCounter(0),
+      runNumber(0)
   {
   }
 
@@ -755,7 +776,9 @@ struct DataHeader : public BaseHeader {
       subSpecification(subspec),
       splitPayloadIndex(partIndex),
       payloadSize(size),
-      firstTForbit{0}
+      firstTForbit{0},
+      tfCounter(0),
+      runNumber(0)
   {
   }
 
@@ -809,8 +832,8 @@ static_assert(sizeof(BaseHeader) == 32,
               "BaseHeader struct must be of size 32");
 static_assert(sizeof(DataOrigin) == 4,
               "DataOrigin struct must be of size 4");
-static_assert(sizeof(DataHeader) == 88,
-              "DataHeader struct must be of size 88");
+static_assert(sizeof(DataHeader) == 96,
+              "DataHeader struct must be of size 96");
 static_assert(gSizeMagicString == sizeof(BaseHeader::magicStringInt),
               "Size mismatch in magic string union");
 static_assert(sizeof(BaseHeader::sMagicString) == sizeof(BaseHeader::magicStringInt),

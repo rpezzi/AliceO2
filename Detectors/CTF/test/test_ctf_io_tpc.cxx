@@ -39,7 +39,11 @@ BOOST_AUTO_TEST_CASE(CTFTest)
   bVec.resize(sz);
   ccFlat = reinterpret_cast<CompressedClustersFlat*>(bVec.data());
   auto buff = reinterpret_cast<void*>(reinterpret_cast<char*>(bVec.data()) + sizeCFlatBody);
-  CTFCoder::setCompClusAddresses(c, buff);
+  {
+    CTFCoder coder;
+    coder.setCompClusAddresses(c, buff);
+    coder.setCombineColumns(true);
+  }
   ccFlat->set(sz, c);
 
   // fill some data
@@ -80,7 +84,11 @@ BOOST_AUTO_TEST_CASE(CTFTest)
   TStopwatch sw;
   sw.Start();
   std::vector<o2::ctf::BufferType> vecIO;
-  CTFCoder::encode(vecIO, c); // compress
+  {
+    CTFCoder coder;
+    coder.setCombineColumns(true);
+    coder.encode(vecIO, c); // compress
+  }
   sw.Stop();
   LOG(INFO) << "Compressed in " << sw.CpuTime() << " s";
 
@@ -112,7 +120,11 @@ BOOST_AUTO_TEST_CASE(CTFTest)
   std::vector<char> vecIn;
   sw.Start();
   const auto ctfImage = o2::tpc::CTF::getImage(vecIO.data());
-  CTFCoder::decode(ctfImage, vecIn); // decompress
+  {
+    CTFCoder coder;
+    coder.setCombineColumns(true);
+    coder.decode(ctfImage, vecIn); // decompress
+  }
   sw.Stop();
   LOG(INFO) << "Decompressed in " << sw.CpuTime() << " s";
   //

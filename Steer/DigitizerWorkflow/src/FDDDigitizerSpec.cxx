@@ -18,7 +18,7 @@
 #include "Headers/DataHeader.h"
 #include "Steer/HitProcessingManager.h" // for DigitizationContext
 #include "DetectorsBase/BaseDPLDigitizer.h"
-#include "SimulationDataFormat/MCTruthContainer.h"
+#include "SimulationDataFormat/ConstMCTruthContainer.h"
 #include "Framework/Task.h"
 #include "DataFormatsParameters/GRPObject.h"
 #include "FDDSimulation/Digitizer.h"
@@ -30,7 +30,6 @@
 
 using namespace o2::framework;
 using SubSpecificationType = o2::framework::DataAllocator::SubSpecificationType;
-
 
 namespace o2
 {
@@ -75,6 +74,7 @@ class FDDDPLDigitizerTask : public o2::base::BaseDPLDigitizer
     // loop over all composite collisions given from context
     // (aka loop over all the interaction records)
     std::vector<o2::fdd::Hit> hits;
+    o2::dataformats::MCTruthContainer<o2::fdd::MCLabel> labels;
 
     for (int collID = 0; collID < irecords.size(); ++collID) {
 
@@ -90,20 +90,23 @@ class FDDDPLDigitizerTask : public o2::base::BaseDPLDigitizer
         mDigitizer.setEventID(part.entryID);
         mDigitizer.setSrcID(part.sourceID);
 
-        mDigitizer.process(hits, mDigitsBC, mDigitsCh, mLabels);
+        mDigitizer.process(hits, mDigitsBC, mDigitsCh, mDigitsTrig, labels);
       }
     }
 
     o2::InteractionTimeRecord terminateIR;
     terminateIR.orbit = 0xffffffff; // supply IR in the infinite future to flush all cached BC
     mDigitizer.setInteractionRecord(terminateIR);
-    mDigitizer.flush(mDigitsBC, mDigitsCh, mLabels);
+    mDigitizer.flush(mDigitsBC, mDigitsCh, mDigitsTrig, labels);
 
     // send out to next stage
     pc.outputs().snapshot(Output{"FDD", "DIGITSBC", 0, Lifetime::Timeframe}, mDigitsBC);
     pc.outputs().snapshot(Output{"FDD", "DIGITSCH", 0, Lifetime::Timeframe}, mDigitsCh);
+    pc.outputs().snapshot(Output{"FDD", "TRIGGERINPUT", 0, Lifetime::Timeframe}, mDigitsTrig);
     if (pc.outputs().isAllowed({"FDD", "DIGITLBL", 0})) {
-      pc.outputs().snapshot(Output{"FDD", "DIGITLBL", 0, Lifetime::Timeframe}, mLabels);
+      auto& sharedlabels = pc.outputs().make<o2::dataformats::ConstMCTruthContainer<o2::fdd::MCLabel>>(Output{"FDD", "DIGITLBL", 0, Lifetime::Timeframe});
+      labels.flatten_to(sharedlabels);
+      labels.clear_andfreememory();
     }
 
     LOG(INFO) << "FDD: Sending ROMode= " << mROMode << " to GRPUpdater";
@@ -120,7 +123,7 @@ class FDDDPLDigitizerTask : public o2::base::BaseDPLDigitizer
   std::vector<TChain*> mSimChains;
   std::vector<o2::fdd::ChannelData> mDigitsCh;
   std::vector<o2::fdd::Digit> mDigitsBC;
-  o2::dataformats::MCTruthContainer<o2::fdd::MCLabel> mLabels; // labels which get filled
+  std::vector<o2::fdd::DetTrigInput> mDigitsTrig;
 
   // RS: at the moment using hardcoded flag for continuous readout
   o2::parameters::GRPObject::ROMode mROMode = o2::parameters::GRPObject::CONTINUOUS; // readout mode
@@ -136,6 +139,7 @@ o2::framework::DataProcessorSpec getFDDDigitizerSpec(int channel, bool mctruth)
   std::vector<OutputSpec> outputs;
   outputs.emplace_back("FDD", "DIGITSBC", 0, Lifetime::Timeframe);
   outputs.emplace_back("FDD", "DIGITSCH", 0, Lifetime::Timeframe);
+  outputs.emplace_back("FDD", "TRIGGERINPUT", 0, Lifetime::Timeframe);
   if (mctruth) {
     outputs.emplace_back("FDD", "DIGITLBL", 0, Lifetime::Timeframe);
   }

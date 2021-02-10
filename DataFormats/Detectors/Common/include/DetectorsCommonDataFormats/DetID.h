@@ -70,7 +70,8 @@ class DetID
   static constexpr ID ACO = 15;
 #ifdef ENABLE_UPGRADES
   static constexpr ID IT3 = 16;
-  static constexpr ID EC0 = 17;
+  static constexpr ID TRK = 17;
+  static constexpr ID EC0 = 18;
   static constexpr ID Last = EC0;
 #else
   static constexpr ID Last = ACO; ///< if extra detectors added, update this !!!
@@ -133,19 +134,19 @@ class DetID
 
   static constexpr const char* sDetNames[nDetectors + 1] = ///< defined detector names
 #ifdef ENABLE_UPGRADES
-    {"ITS", "TPC", "TRD", "TOF", "PHS", "CPV", "EMC", "HMP", "MFT", "MCH", "MID", "ZDC", "FT0", "FV0", "FDD", "ACO", "IT3", "EC0", nullptr};
+    {"ITS", "TPC", "TRD", "TOF", "PHS", "CPV", "EMC", "HMP", "MFT", "MCH", "MID", "ZDC", "FT0", "FV0", "FDD", "ACO", "IT3", "TRK", "EC0", nullptr};
 #else
     {"ITS", "TPC", "TRD", "TOF", "PHS", "CPV", "EMC", "HMP", "MFT", "MCH", "MID", "ZDC", "FT0", "FV0", "FDD", "ACO", nullptr};
 #endif
   // detector names, will be defined in DataSources
   static constexpr std::array<mask_t, nDetectors> sMasks = ///< detectot masks
-    {utils::bit2Mask(ITS), utils::bit2Mask(TPC), utils::bit2Mask(TRD), utils::bit2Mask(TOF), utils::bit2Mask(PHS),
-     utils::bit2Mask(CPV), utils::bit2Mask(EMC), utils::bit2Mask(HMP), utils::bit2Mask(MFT), utils::bit2Mask(MCH),
-     utils::bit2Mask(MID), utils::bit2Mask(ZDC), utils::bit2Mask(FT0), utils::bit2Mask(FV0), utils::bit2Mask(FDD),
-     utils::bit2Mask(ACO)
+    {math_utils::bit2Mask(ITS), math_utils::bit2Mask(TPC), math_utils::bit2Mask(TRD), math_utils::bit2Mask(TOF), math_utils::bit2Mask(PHS),
+     math_utils::bit2Mask(CPV), math_utils::bit2Mask(EMC), math_utils::bit2Mask(HMP), math_utils::bit2Mask(MFT), math_utils::bit2Mask(MCH),
+     math_utils::bit2Mask(MID), math_utils::bit2Mask(ZDC), math_utils::bit2Mask(FT0), math_utils::bit2Mask(FV0), math_utils::bit2Mask(FDD),
+     math_utils::bit2Mask(ACO)
 #ifdef ENABLE_UPGRADES
        ,
-     utils::bit2Mask(IT3), utils::bit2Mask(EC0)
+     math_utils::bit2Mask(IT3), math_utils::bit2Mask(TRK), utils::bit2Mask(EC0)
 #endif
   };
 
@@ -156,7 +157,7 @@ class DetID
      o2h::gDataOriginMID, o2h::gDataOriginZDC, o2h::gDataOriginFT0, o2h::gDataOriginFV0, o2h::gDataOriginFDD, o2h::gDataOriginACO
 #ifdef ENABLE_UPGRADES
      ,
-     o2h::gDataOriginIT3, o2h::gDataOriginEC0
+     o2h::gDataOriginIT3, o2h::gDataOriginTRK, o2h::gDataOriginEC0
 #endif
   };
 

@@ -20,18 +20,27 @@
 #include "TTree.h"
 #include "TMath.h"
 
-#include "MathUtils/MathBase.h"
+#include "MathUtils/fit.h"
 #include "TPCBase/CalArray.h"
 #include "TPCBase/CalDet.h"
 #include "TPCBase/CRU.h"
 #include "TPCBase/Mapper.h"
+#include "TPCBase/Utils.h"
 #include "TPCBase/Sector.h"
 
 #include "TPCCalibration/CalibTreeDump.h"
 
-using o2::math_utils::math_base::median;
+using o2::math_utils::median;
 
 using namespace o2::tpc;
+
+void CalibTreeDump::addCalPads(const std::string_view file, const std::string_view calPadNames)
+{
+  auto calPads = utils::readCalPads(file, calPadNames);
+  for (auto calPad : calPads) {
+    add(calPad);
+  }
+}
 
 //______________________________________________________________________________
 void CalibTreeDump::dumpToFile(const std::string filename)
@@ -195,8 +204,12 @@ void CalibTreeDump::addCalDetObjects(TTree* tree)
 {
 
   int iter = 0;
-  for (auto& calDet : mCalDetObjects) {
+  for (auto pcalDet : mCalDetObjects) {
     // ===| branch names |===
+    if (!pcalDet) {
+      continue;
+    }
+    auto& calDet = *pcalDet;
     std::string name = calDet.getName();
 
     if (name == "PadCalibrationObject" || name.size() == 0) {
@@ -206,20 +219,27 @@ void CalibTreeDump::addCalDetObjects(TTree* tree)
     std::string meanName = fmt::format("{}_mean", name);
     std::string stdDevName = fmt::format("{}_stdDev", name);
     std::string medianName = fmt::format("{}_median", name);
+    std::string median1Name = fmt::format("{}_median1", name);
+    std::string median2Name = fmt::format("{}_median2", name);
+    std::string median3Name = fmt::format("{}_median3", name);
 
     // ===| branch variables |===
     std::vector<float>* data = nullptr;
     float mean{};
     float stdDev{};
-    float median{};
+    float median[4]{};
 
     // ===| branch definitions |===
     TBranch* brMean = tree->Branch(meanName.data(), &mean);
     TBranch* brStdDev = tree->Branch(stdDevName.data(), &stdDev);
-    TBranch* brMedian = tree->Branch(medianName.data(), &median);
+    TBranch* brMedian = tree->Branch(medianName.data(), &median[0]);
+    TBranch* brMedian1 = tree->Branch(median1Name.data(), &median[1]);
+    TBranch* brMedian2 = tree->Branch(median2Name.data(), &median[2]);
+    TBranch* brMedian3 = tree->Branch(median3Name.data(), &median[3]);
     TBranch* brData = tree->Branch(name.data(), &data);
 
     // ===| loop over ROCs and fill |===
+    int roc = 0;
     for (auto& calArray : calDet.getData()) {
       // ---| set data |---
       data = &calArray.getData();
@@ -227,13 +247,22 @@ void CalibTreeDump::addCalDetObjects(TTree* tree)
       // ---| statistics |---
       mean = TMath::Mean(data->begin(), data->end());
       stdDev = TMath::StdDev(data->begin(), data->end());
-      median = TMath::Median(data->size(), data->data());
+      median[0] = median[1] = median[2] = median[3] = TMath::Median(data->size(), data->data());
+      if (roc > 35) {
+        median[1] = TMath::Median(Mapper::getPadsInOROC1(), data->data());
+        median[2] = TMath::Median(Mapper::getPadsInOROC2(), data->data() + Mapper::getPadsInOROC1());
+        median[3] = TMath::Median(Mapper::getPadsInOROC3(), data->data() + Mapper::getPadsInOROC1() + Mapper::getPadsInOROC2());
+      }
 
       // ---| filling |---
       brData->Fill();
       brMean->Fill();
       brStdDev->Fill();
       brMedian->Fill();
+      brMedian1->Fill();
+      brMedian2->Fill();
+      brMedian3->Fill();
+      ++roc;
     }
   }
 }
@@ -244,8 +273,9 @@ void CalibTreeDump::readTraceLengths(std::string_view mappingDir)
   std::string inputDir = mappingDir.data();
   if (!inputDir.size()) {
     const char* aliceO2env = std::getenv("O2_ROOT");
-    if (aliceO2env)
+    if (aliceO2env) {
       inputDir = aliceO2env;
+    }
     inputDir += "/share/Detectors/TPC/files";
   }
 
@@ -302,6 +332,8 @@ void CalibTreeDump::setTraceLengths(std::string_view inputFile, std::vector<floa
 void CalibTreeDump::setDefaultAliases(TTree* tree)
 {
   tree->SetAlias("sector", "roc%36");
+  tree->SetAlias("padsPerRow", "2*(pad-cpad)");
+  tree->SetAlias("isEdgePad", "(pad==0) || (pad==padsPerRow-1)");
   tree->SetAlias("rowInSector", "row + (roc>35)*63");
   tree->SetAlias("padWidth", "0.4 + (roc > 35) * 0.2");
   tree->SetAlias("padHeight", "0.75 + (rowInSector > 62) * 0.25 + (rowInSector > 96) * 0.2 + (rowInSector > 126) * 0.3");
@@ -312,14 +344,18 @@ void CalibTreeDump::setDefaultAliases(TTree* tree)
   tree->SetAlias("region", "cruInSector");
   tree->SetAlias("partition", "int(cruInSector / 2)");
 
+  tree->SetAlias("padWidth", "(region == 0) * 0.416 + (region == 1) * 0.42 + (region == 2) * 0.42 + (region == 3) * 0.436 + (region == 4) * 0.6 + (region == 5) * 0.6 + (region == 6) * 0.608 + (region == 7) * 0.588 + (region == 8) * 0.604 + (region == 9) * 0.607");
+  tree->SetAlias("padHeight", "0.75 + (region>3)*0.25 + (region>5)*0.2 + (region>7)*0.3");
+  tree->SetAlias("padArea", "padHeight * padWidth");
+
   tree->SetAlias("IROC", "roc < 36");
   tree->SetAlias("OROC", "roc >= 36");
   tree->SetAlias("OROC1", "partition == 2");
   tree->SetAlias("OROC2", "partition == 3");
   tree->SetAlias("OROC3", "partition == 4");
 
-  tree->SetAlias("A_Side", "sector < 36");
-  tree->SetAlias("C_Side", "sector >= 36");
+  tree->SetAlias("A_Side", "sector < 18");
+  tree->SetAlias("C_Side", "sector >= 18");
 
   if (mAddFEEInfo) {
     tree->SetAlias("fecID", "fecInSector + sector * 91");
