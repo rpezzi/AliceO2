@@ -35,7 +35,7 @@ GPUdii() bool GPUITSFitterKernel::fitTrack(GPUITSFitter& GPUrestrict() Fitter, G
     if (track.mClusters[iLayer] == o2::its::constants::its::UnusedIndex) {
       continue;
     }
-    const o2::its::TrackingFrameInfo& GPUrestrict() trackingHit = Fitter.trackingFrame()[iLayer][track.mClusters[iLayer]];
+    const TrackingFrameInfo& GPUrestrict() trackingHit = Fitter.trackingFrame()[iLayer][track.mClusters[iLayer]];
 
     if (prop.PropagateToXAlpha(trackingHit.xTrackingFrame, trackingHit.alphaTrackingFrame, step > 0)) {
       return false;
@@ -73,7 +73,7 @@ GPUdii() void GPUITSFitterKernel::Thread<0>(int nBlocks, int nThreads, int iBloc
   int refitCounters[4]{0, 0, 0, 0};
 #endif
   for (int iRoad = get_global_id(0); iRoad < Fitter.NumberOfRoads(); iRoad += get_global_size(0)) {
-    o2::its::Road& road = Fitter.roads()[iRoad];
+    Road& road = Fitter.roads()[iRoad];
     int clusters[7] = {o2::its::constants::its::UnusedIndex, o2::its::constants::its::UnusedIndex, o2::its::constants::its::UnusedIndex, o2::its::constants::its::UnusedIndex, o2::its::constants::its::UnusedIndex, o2::its::constants::its::UnusedIndex, o2::its::constants::its::UnusedIndex};
     int lastCellLevel = o2::its::constants::its::UnusedIndex;
     CA_DEBUGGER(int nClusters = 2);

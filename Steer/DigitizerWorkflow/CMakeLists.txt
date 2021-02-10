@@ -9,7 +9,6 @@
 # submit itself to any jurisdiction.
 
 
-if(ENABLE_UPGRADES)
 o2_add_executable(digitizer-workflow
                   COMPONENT_NAME sim
                   SOURCES src/EMCALDigitWriterSpec.cxx
@@ -30,7 +29,6 @@ o2_add_executable(digitizer-workflow
                           src/TPCDigitizerSpec.cxx
                           src/ZDCDigitizerSpec.cxx
                           src/TOFDigitizerSpec.cxx
-                          src/EC0DigitizerSpec.cxx
                   PUBLIC_LINK_LIBRARIES O2::Framework
                                         O2::Steer
                                         O2::CommonConstants
@@ -42,9 +40,6 @@ o2_add_executable(digitizer-workflow
                                         O2::ITSMFTSimulation
                                         O2::ITSSimulation
                                         O2::ITSMFTWorkflow
-                                        O2::EndCapsSimulation
-                                        O2::EC0Simulation
-                                        O2::EndCapsWorkflow
                                         O2::MCHSimulation
                                         O2::MCHBase
                                         O2::MFTSimulation

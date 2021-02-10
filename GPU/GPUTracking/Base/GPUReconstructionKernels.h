@@ -65,9 +65,6 @@ GPUCA_KRNL_LB((GPUTPCGMO2Output, output                     ), (simple), (), ())
 GPUCA_KRNL((   GPUTPCGMO2Output, mc                         ), (simple), (), ())
 GPUCA_KRNL_LB((GPUTRDTrackerKernels                         ), (simple), (), ())
 GPUCA_KRNL_LB((GPUITSFitterKernel                           ), (simple), (), ())
-#ifdef ENABLE_UPGRADES
-GPUCA_KRNL_LB((GPUEC0FitterKernel                           ), (simple), (), ())
-#endif
 GPUCA_KRNL_LB((GPUTPCConvertKernel                          ), (simple), (), ())
 GPUCA_KRNL_LB((GPUTPCCompressionKernels, step0attached      ), (simple), (), ())
 GPUCA_KRNL_LB((GPUTPCCompressionKernels, step1unattached    ), (simple), (), ())

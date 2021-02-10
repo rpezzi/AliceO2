@@ -41,17 +41,6 @@ class VertexerTraits;
 } // namespace its
 } // namespace o2
 
-#ifdef ENABLE_UPGRADES
-namespace o2
-{
-namespace ecl
-{
-class TrackerTraitsEC0;
-class VertexerTraitsEC0;
-} // namespace ecl
-} // namespace o2
-#endif
-
 namespace GPUCA_NAMESPACE
 {
 namespace gpu
@@ -227,10 +216,6 @@ class GPUReconstruction
 
   // Helpers to fetch processors from other shared libraries
   virtual void GetITSTraits(std::unique_ptr<o2::its::TrackerTraits>* trackerTraits, std::unique_ptr<o2::its::VertexerTraits>* vertexerTraits);
-#ifdef ENABLE_UPGRADES
-  virtual void GetEC0Traits(std::unique_ptr<o2::ecl::TrackerTraitsEC0>* trackerTraits, std::unique_ptr<o2::ecl::VertexerTraitsEC0>* vertexerTraits);
-#endif
-
   bool slavesExist() { return mSlaves.size() || mMaster; }
 
   // Getters / setters for parameters

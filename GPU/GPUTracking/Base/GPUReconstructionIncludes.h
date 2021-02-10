@@ -34,9 +34,6 @@
 #endif
 
 #include "GPUReconstructionIncludesITS.h"
-#ifdef ENABLE_UPGRADES
-#include "GPUReconstructionIncludesEC0.h"
-#endif
 
 #define RANDOM_ERROR
 //#define RANDOM_ERROR || rand() % 500 == 1

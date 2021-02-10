@@ -100,11 +100,6 @@ class GPUFakeEmpty
 class GPUITSFitter
 {
 };
-#ifdef ENABLE_UPGRADES
-class GPUEC0Fitter
-{
-};
-#endif
 class GPUTPCConvert
 {
 };

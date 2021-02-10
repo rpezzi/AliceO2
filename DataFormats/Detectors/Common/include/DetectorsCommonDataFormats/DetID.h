@@ -146,7 +146,7 @@ class DetID
      math_utils::bit2Mask(ACO)
 #ifdef ENABLE_UPGRADES
        ,
-     math_utils::bit2Mask(IT3), math_utils::bit2Mask(TRK), utils::bit2Mask(EC0)
+     math_utils::bit2Mask(IT3), math_utils::bit2Mask(TRK), math_utils::bit2Mask(EC0)
 #endif
   };
 

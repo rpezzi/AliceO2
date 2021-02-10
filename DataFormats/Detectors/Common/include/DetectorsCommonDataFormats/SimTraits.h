@@ -90,7 +90,7 @@ class SimTraits
 #ifdef ENABLE_UPGRADES
       ,
       /*IT3*/ VS{ "IT3Hit" },
-      /*TRK*/ VS{ "TRKHit" }
+      /*TRK*/ VS{ "TRKHit" },
       /*EC0*/ VS{ "EC0Hit" }
 #endif
     };

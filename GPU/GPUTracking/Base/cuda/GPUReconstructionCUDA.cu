@@ -42,12 +42,6 @@ __global__ void dummyInitKernel(void*)
 #if defined(HAVE_O2HEADERS) && !defined(GPUCA_NO_ITS_TRAITS)
 #include "ITStrackingCUDA/TrackerTraitsNV.h"
 #include "ITStrackingCUDA/VertexerTraitsGPU.h"
-
-#ifdef ENABLE_UPGRADES
-#include "EC0trackingCUDA/TrackerTraitsEC0NV.h"
-#include "EC0trackingCUDA/VertexerTraitsEC0GPU.h"
-#endif
-
 #else
 namespace o2::its
 {
@@ -223,18 +217,6 @@ void GPUReconstructionCUDABackend::GetITSTraits(std::unique_ptr<o2::its::Tracker
     vertexerTraits->reset(new o2::its::VertexerTraitsGPU);
   }
 }
-
-#ifdef ENABLE_UPGRADES
-void GPUReconstructionCUDABackend::GetEC0Traits(std::unique_ptr<o2::ecl::TrackerTraitsEC0>* trackerTraits, std::unique_ptr<o2::ecl::VertexerTraitsEC0>* vertexerTraits)
-{
-  if (trackerTraits) {
-    trackerTraits->reset(new o2::ecl::TrackerTraitsEC0NV);
-  }
-  if (vertexerTraits) {
-    vertexerTraits->reset(new o2::ecl::VertexerTraitsEC0GPU);
-  }
-}
-#endif
 
 void GPUReconstructionCUDABackend::UpdateSettings()
 {

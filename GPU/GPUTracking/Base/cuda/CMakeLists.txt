@@ -108,29 +108,6 @@ if(NOT ALIGPU_BUILD_TYPE STREQUAL "ALIROOT")
 endif()
 # -------------------------------- End RTC -------------------------------------------------------
 
-
-if(ENABLE_UPGRADES)
-if(ALIGPU_BUILD_TYPE STREQUAL "O2")
-  o2_add_library(
-    ${MODULE}
-    SOURCES ${SRCS}
-    PRIVATE_INCLUDE_DIRECTORIES
-      ${CMAKE_SOURCE_DIR}/Detectors/Base/src
-      ${CMAKE_SOURCE_DIR}/Detectors/TRD/base/src
-    PUBLIC_LINK_LIBRARIES O2::GPUTracking O2::ITStrackingCUDA O2::EC0trackingCUDA cub::cub
-    TARGETVARNAME targetName)
-
-  target_compile_definitions(
-    ${targetName} PUBLIC GPUCA_GPULIBRARY=CUDA
-    $<TARGET_PROPERTY:O2::GPUTracking,COMPILE_DEFINITIONS>)
-
-  target_compile_options(${targetName} PUBLIC --expt-relaxed-constexpr)
-
-  set_target_properties(${targetName} PROPERTIES LINKER_LANGUAGE CXX)
-
-  install(FILES ${HDRS} DESTINATION include/GPU)
-endif()
-else()
 if(ALIGPU_BUILD_TYPE STREQUAL "O2")
   o2_add_library(
     ${MODULE}
@@ -149,11 +126,6 @@ if(ALIGPU_BUILD_TYPE STREQUAL "O2")
 
   install(FILES ${HDRS} DESTINATION include/GPU)
 endif()
-endif()
-
-
-
-
 
 if(ALIGPU_BUILD_TYPE STREQUAL "ALIROOT")
   set(targetName Ali${MODULE})

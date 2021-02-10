@@ -46,9 +46,6 @@ class GPUTRDTracker_t
 #include "GPUTPCConvert.h"
 #include "GPUTPCCompression.h"
 #include "GPUITSFitter.h"
-#ifdef ENABLE_UPGRADES
-#include "GPUEC0Fitter.h"
-#endif
 #include "GPUTPCClusterFinder.h"
 #include "GPUTrackingRefit.h"
 #else
@@ -81,9 +78,6 @@ struct GPUConstantMem {
   GPUErrors errorCodes;
 #ifdef GPUCA_KERNEL_DEBUGGER_OUTPUT
   GPUKernelDebugOutput debugOutput;
-#endif
-#ifdef ENABLE_UPGRADES
-  GPUEC0Fitter ec0Fitter;
 #endif
 };
 
