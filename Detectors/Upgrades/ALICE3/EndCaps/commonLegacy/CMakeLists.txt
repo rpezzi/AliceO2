@@ -10,7 +10,3 @@
 
 add_subdirectory(base)
 add_subdirectory(simulation)
-add_subdirectory(reconstruction)
-add_subdirectory(workflow)
-
-o2_data_file(COPY data DESTINATION Detectors/EndCaps)

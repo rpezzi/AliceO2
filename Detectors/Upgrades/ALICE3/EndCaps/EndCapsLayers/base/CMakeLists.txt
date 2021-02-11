@@ -9,11 +9,8 @@
 # submit itself to any jurisdiction.
 
 o2_add_library(ECLayersBase
-               SOURCES src/GeometryTGeo.cxx src/ContainerFactory.cxx
-                       src/MisalignmentParameter.cxx
+               SOURCES src/GeometryTGeo.cxx 
                PUBLIC_LINK_LIBRARIES O2::DetectorsBase O2::EndCapsBase)
 
 o2_target_root_dictionary(ECLayersBase
-                          HEADERS include/ECLayersBase/GeometryTGeo.h
-                                  include/ECLayersBase/ContainerFactory.h
-                                  include/ECLayersBase/MisalignmentParameter.h)
+                          HEADERS include/ECLayersBase/GeometryTGeo.h)

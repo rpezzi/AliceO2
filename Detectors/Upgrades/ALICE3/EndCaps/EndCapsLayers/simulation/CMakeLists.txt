@@ -25,17 +25,3 @@ o2_target_root_dictionary(EC0Simulation
                                   include/EC0Simulation/V3Layer.h
                                   include/EC0Simulation/V11Geometry.h
                                   include/EC0Simulation/V3Services.h)
-
-o2_data_file(COPY data  DESTINATION Detectors/EC0/simulation)
-
-o2_add_executable(digi2raw
-                  COMPONENT_NAME ec0
-                  SOURCES src/digi2raw.cxx
-                  PUBLIC_LINK_LIBRARIES O2::EndCapsReconstruction
-                                        O2::DataFormatsITSMFT
-                                        O2::EndCapsBase
-                                        O2::EndCapsSimulation
-                                        O2::DetectorsRaw
-                                        O2::DetectorsCommonDataFormats
-                                        O2::CommonUtils
-                                        Boost::program_options)

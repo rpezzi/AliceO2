@@ -9,13 +9,10 @@
 # submit itself to any jurisdiction.
 
 o2_add_library(EndCapsBase
-               SOURCES src/SegmentationAlpide.cxx
-                       src/GeometryTGeo.cxx src/DPLAlpideParam.cxx
+               SOURCES src/GeometryTGeo.cxx
                PUBLIC_LINK_LIBRARIES O2::MathUtils
                                      O2::DetectorsCommonDataFormats
                                      O2::SimConfig)
 
 o2_target_root_dictionary(EndCapsBase
-                          HEADERS include/EndCapsBase/SegmentationAlpide.h
-                                  include/EndCapsBase/GeometryTGeo.h
-                                  include/EndCapsBase/DPLAlpideParam.h)
+                          HEADERS include/EndCapsBase/GeometryTGeo.h)

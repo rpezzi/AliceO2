@@ -16,21 +16,5 @@
 
 #pragma link C++ class o2::endcaps::Hit + ;
 #pragma link C++ class std::vector < o2::endcaps::Hit> + ;
-#pragma link C++ class o2::endcaps::ChipDigitsContainer + ;
-#pragma link C++ class o2::endcaps::PreDigit + ;
-#pragma link C++ class o2::endcaps::PreDigitLabelRef + ;
-#pragma link C++ class o2::endcaps::AlpideChip + ;
-#pragma link C++ class o2::endcaps::AlpideSimResponse + ;
-#pragma link C++ class o2::endcaps::AlpideRespSimMat + ;
-#pragma link C++ class o2::endcaps::DigiParams + ;
-#pragma link C++ class o2::endcaps::Digitizer + ;
-#pragma link C++ class o2::endcaps::AlpideSignalTrapezoid + ;
-
-#pragma link C++ class o2::endcaps::ClusterShape + ;
-
-#pragma link C++ class o2::endcaps::DPLDigitizerParam < o2::detectors::DetID::EC0> + ;
-#pragma link C++ class o2::conf::ConfigurableParamHelper < o2::endcaps::DPLDigitizerParam < o2::detectors::DetID::EC0>> + ;
-
-#pragma link C++ class o2::endcaps::MC2RawEncoder < o2::endcaps::ChipMappingEC0> + ;
 
 #endif
