@@ -23,7 +23,7 @@
 #include <vector>
 #include <tuple>
 #include "ECLayersBase/GeometryTGeo.h"
-#include "MathUtils/Cartesian3D.h"
+#include "MathUtils/Cartesian.h"
 #include "DataFormatsITSMFT/Cluster.h"
 #include "DataFormatsITSMFT/CompCluster.h"
 #include "DataFormatsITS/TrackITS.h"

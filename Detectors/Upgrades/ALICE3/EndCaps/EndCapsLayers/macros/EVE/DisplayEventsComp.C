@@ -438,7 +438,7 @@ void init(int entry = 0, int chip = 13,
   // Geometry
   o2::base::GeometryManager::loadGeometry(inputGeom);
   auto gman = o2::ecl::GeometryTGeo::Instance();
-  gman->fillMatrixCache(o2::utils::bit2Mask(o2::TransformType::T2L, o2::TransformType::T2GRot,
+  gman->fillMatrixCache(o2::math_utils::bit2Mask(o2::TransformType::T2L, o2::TransformType::T2GRot,
                                             o2::TransformType::L2G));
 
   // Chip View

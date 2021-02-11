@@ -14,7 +14,7 @@
 #include "EC0Reconstruction/TrivialClustererTask.h"
 #include "DataFormatsITSMFT/Digit.h"
 #include "DataFormatsITSMFT/Cluster.h"
-#include "MathUtils/Cartesian3D.h"
+#include "MathUtils/Cartesian.h"
 #include "MathUtils/Utils.h"
 #include "SimulationDataFormat/MCCompLabel.h"
 #include "SimulationDataFormat/MCTruthContainer.h"

@@ -43,7 +43,7 @@ namespace ecl
 class GeometryTGeo : public o2::endcaps::GeometryTGeo
 {
  public:
-  typedef o2::Transform3D Mat3D;
+  typedef o2::math_utils::Transform3D Mat3D;
   using DetMatrixCache::getMatrixL2G;
   using DetMatrixCache::getMatrixT2GRot;
   using DetMatrixCache::getMatrixT2L;

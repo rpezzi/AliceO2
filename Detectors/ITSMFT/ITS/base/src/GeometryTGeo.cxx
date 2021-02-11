@@ -43,6 +43,8 @@
 using namespace TMath;
 using namespace o2::its;
 using namespace o2::detectors;
+using namespace o2::utils;
+
 
 using Segmentation = o2::itsmft::SegmentationAlpide;
 

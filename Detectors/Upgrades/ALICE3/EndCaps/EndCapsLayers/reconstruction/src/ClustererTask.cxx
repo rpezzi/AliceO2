@@ -13,7 +13,7 @@
 
 #include "DetectorsCommonDataFormats/DetID.h"
 #include "EC0Reconstruction/ClustererTask.h"
-#include "MathUtils/Cartesian3D.h"
+#include "MathUtils/Cartesian.h"
 #include "MathUtils/Utils.h"
 #include "FairLogger.h"
 #include <TFile.h>
@@ -60,7 +60,7 @@ void ClustererTask::Init()
   }
 
   GeometryTGeo* geom = GeometryTGeo::Instance();
-  geom->fillMatrixCache(o2::utils::bit2Mask(o2::TransformType::T2L)); // make sure T2L matrices are loaded
+  geom->fillMatrixCache(o2::math_utils::bit2Mask(o2::TransformType::T2L)); // make sure T2L matrices are loaded
   mGeometry = geom;
   mClusterer.setGeometry(geom);
 

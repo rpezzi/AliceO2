@@ -68,7 +68,7 @@ void STFDecoder<Mapping>::init(InitContext& ic)
     GeometryTGeo* geom = nullptr;
     if (detID == o2::detectors::DetID::EC0) {
       geom = o2::ecl::GeometryTGeo::Instance();
-      geom->fillMatrixCache(o2::utils::bit2Mask(o2::TransformType::T2L));
+      geom->fillMatrixCache(o2::math_utils::bit2Mask(o2::TransformType::T2L));
     }
     mClusterer = std::make_unique<Clusterer>();
     mClusterer->setGeometry(geom);

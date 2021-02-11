@@ -42,7 +42,7 @@ void ClustererDPL::init(InitContext& ic)
 {
   o2::base::GeometryManager::loadGeometry(); // for generating full clusters
   o2::ecl::GeometryTGeo* geom = o2::ecl::GeometryTGeo::Instance();
-  geom->fillMatrixCache(o2::utils::bit2Mask(o2::TransformType::T2L));
+  geom->fillMatrixCache(o2::math_utils::bit2Mask(o2::TransformType::T2L));
 
   mClusterer = std::make_unique<o2::endcaps::Clusterer>();
   mClusterer->setGeometry(geom);

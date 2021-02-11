@@ -14,7 +14,7 @@
 #include "DataFormatsITSMFT/Digit.h"
 #include "EndCapsBase/SegmentationAlpide.h"
 #include "EndCapsSimulation/Digitizer.h"
-#include "MathUtils/Cartesian3D.h"
+#include "MathUtils/Cartesian.h"
 #include "SimulationDataFormat/MCTruthContainer.h"
 
 #include <TRandom.h>
