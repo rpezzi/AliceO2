@@ -91,10 +91,9 @@ class GeometryTGeo : public o2::itsmft::GeometryTGeo
  protected:
   static constexpr int MAXLAYERS = 15; ///< max number of active layers
 
-  Int_t mNumberOfLayers;                 ///< number of layers
-  static std::string sVolumeName;        ///< Mother volume name
-  static std::string sLayerName;         ///< Layer name
-  static std::string sWrapperVolumeName; ///< Wrapper volume name
+  Int_t mNumberOfLayers;          ///< number of layers
+  static std::string sVolumeName; ///< Mother volume name
+  static std::string sLayerName;  ///< Layer name
 
  private:
   static std::unique_ptr<o2::ec0::GeometryTGeo> sInstance; ///< singletone instance

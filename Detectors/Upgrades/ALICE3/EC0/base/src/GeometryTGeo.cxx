@@ -12,7 +12,7 @@
 /// \brief Implementation of the GeometryTGeo class
 /// \author cvetan.cheshkov@cern.ch - 15/02/2007
 /// \author ruben.shahoyan@cern.ch - adapted to ITSupg 18/07/2012
-/// \author rafael.pezzi@cern.ch - adapted to PostLS4EndCaps 25/06/2020
+/// \author rafael.pezzi@cern.ch - adapted to ALICE 3 EndCaps 14/02/2021
 
 // ATTENTION: In opposite to old AliITSgeomTGeo, all indices start from 0, not from 1!!!
 
@@ -48,9 +48,8 @@ ClassImp(o2::ec0::GeometryTGeo);
 
 std::unique_ptr<o2::ec0::GeometryTGeo> GeometryTGeo::sInstance;
 
-std::string GeometryTGeo::sVolumeName = "EC0V";               ///< Mother volume name
-std::string GeometryTGeo::sLayerName = "EC0ULayer";           ///< Layer name
-std::string GeometryTGeo::sWrapperVolumeName = "EC0UWrapVol"; ///< Wrapper volume name
+std::string GeometryTGeo::sVolumeName = "EC0V";     ///< Mother volume name
+std::string GeometryTGeo::sLayerName = "EC0ULayer"; ///< Layer name
 
 //__________________________________________________________________________
 GeometryTGeo::GeometryTGeo(bool build, int loadTrans) : o2::itsmft::GeometryTGeo(DetID::EC0)

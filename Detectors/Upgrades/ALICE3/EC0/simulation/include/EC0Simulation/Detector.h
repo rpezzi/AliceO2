@@ -43,7 +43,7 @@ namespace o2
 {
 namespace ec0
 {
-class V3Layer;
+class EC0Layer;
 }
 } // namespace o2
 
@@ -51,28 +51,13 @@ namespace o2
 {
 namespace ec0
 {
-class V3Layer;
+class EC0Layer;
 
 class Detector : public o2::base::DetImpl<Detector>
 {
  public:
-  enum Model {
-    kIBModelDummy = 0,
-    kIBModel0 = 1,
-    kIBModel1 = 2,
-    kIBModel21 = 3,
-    kIBModel22 = 4,
-    kIBModel3 = 5,
-    kIBModel4 = 10,
-    kOBModelDummy = 6,
-    kOBModel0 = 7,
-    kOBModel1 = 8,
-    kOBModel2 = 9
-  };
-
-  static constexpr Int_t sNumberLayers = 7;           ///< Number of layers in ITSU
-  static constexpr Int_t sNumberInnerLayers = 3;      ///< Number of inner layers in ITSU
-  static constexpr Int_t sNumberOfWrapperVolumes = 3; ///< Number of wrapper volumes
+  static constexpr Int_t sNumberLayers = 7;      ///< Number of layers in ITSU
+  static constexpr Int_t sNumberInnerLayers = 3; ///< Number of inner layers in ITSU
 
   /// Name : Detector Name
   /// Active: kTRUE for active detectors (ProcessHits() will be called)
@@ -115,9 +100,6 @@ class Detector : public o2::base::DetImpl<Detector>
                           const TVector3& startMom, double startE, double endTime, double eLoss,
                           unsigned char startStatus, unsigned char endStatus);
 
-  /// Set per wrapper volume parameters
-  void defineWrapperVolume(Int_t id, Double_t rmin, Double_t rmax, Double_t zspan) override;
-
   /// Add alignable top volumes
   void addAlignableVolumes() const override;
 
@@ -155,23 +137,6 @@ class Detector : public o2::base::DetImpl<Detector>
     double mEnergyLoss;            //! energy loss
   } mTrackData;                    //!
 
-  Int_t mNumberOfDetectors;
-
-  Bool_t mModifyGeometry;
-
-  Double_t mWrapperMinRadius[sNumberOfWrapperVolumes]; //! Min radius of wrapper volume
-  Double_t mWrapperMaxRadius[sNumberOfWrapperVolumes]; //! Max radius of wrapper volume
-  Double_t mWrapperZSpan[sNumberOfWrapperVolumes];     //! Z span of wrapper volume
-  Int_t mWrapperLayerId[sNumberLayers];                //! Id of wrapper layer to which layer belongs (-1 if not wrapped)
-
-  Bool_t mTurboLayer[sNumberLayers];          //! True for "turbo" layers
-  Double_t mLayerPhi0[sNumberLayers];         //! Vector of layer's 1st stave phi in lab
-  Double_t mLayerRadii[sNumberLayers];        //! Vector of layer radii
-  Double_t mChipThickness[sNumberLayers];     //! Vector of chip thicknesses
-  Double_t mDetectorThickness[sNumberLayers]; //! Vector of detector thicknesses
-  UInt_t mChipTypeID[sNumberLayers];          //! Vector of detector type id
-  Int_t mBuildLevel[sNumberLayers];           //! Vector of Material Budget Studies
-
   /// Container for hit data
   std::vector<o2::itsmft::Hit>* mHits;
 
@@ -188,7 +153,7 @@ class Detector : public o2::base::DetImpl<Detector>
 
   Detector& operator=(const Detector&);
 
-  V3Layer* mGeometry[sNumberLayers]; //! Geometry
+  EC0Layer* mGeometry[sNumberLayers]; //! Geometry
 
   template <typename Det>
   friend class o2::base::DetImpl;

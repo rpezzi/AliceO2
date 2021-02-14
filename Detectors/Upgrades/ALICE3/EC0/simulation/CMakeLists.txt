@@ -9,8 +9,7 @@
 # submit itself to any jurisdiction.
 
 o2_add_library(EC0Simulation
-               SOURCES src/V11Geometry.cxx
-                       src/V3Layer.cxx
+               SOURCES src/EC0Layer.cxx
                        src/Detector.cxx
                PUBLIC_LINK_LIBRARIES O2::EC0Base
                                      O2::ITSMFTSimulation
@@ -18,5 +17,4 @@ o2_add_library(EC0Simulation
 
 o2_target_root_dictionary(EC0Simulation
                           HEADERS include/EC0Simulation/Detector.h
-                                  include/EC0Simulation/V3Layer.h
-                                  include/EC0Simulation/V11Geometry.h)
+                                  include/EC0Simulation/EC0Layer.h)
