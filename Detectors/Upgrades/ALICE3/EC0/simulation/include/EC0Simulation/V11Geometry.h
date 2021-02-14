@@ -11,8 +11,8 @@
 /// \file V11Geometry.h
 /// \brief Definition of the V11Geometry class
 
-#ifndef ALICEO2_ENDCAPSLAYERS_V11GEOMETRY_H_
-#define ALICEO2_ENDCAPSLAYERS_V11GEOMETRY_H_
+#ifndef ALICEO2_EC0_V11GEOMETRY_H_
+#define ALICEO2_EC0_V11GEOMETRY_H_
 
 #include <TMath.h>   // for DegToRad, Cos, Sin, Tan
 #include <TObject.h> // for TObject
@@ -27,7 +27,7 @@ class TGeoTubeSeg; // lines 14-14
 
 namespace o2
 {
-namespace ecl
+namespace ec0
 {
 
 /// This class is a base class for the ITS geometry version 11. It contains common/standard
@@ -452,7 +452,7 @@ class V11Geometry : public TObject
   Int_t mDebug;                     //! Debug flag/level
   ClassDefOverride(V11Geometry, 1); // Base class for ITS v11 geometry
 };
-} // namespace ecl
+} // namespace ec0
 } // namespace o2
 
 #endif

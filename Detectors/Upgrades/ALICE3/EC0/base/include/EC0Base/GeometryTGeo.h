@@ -14,8 +14,8 @@
 /// \author ruben.shahoyan@cern.ch - adapted to ITSupg 18/07/2012
 /// \author rafael.pezzi@cern.ch - adapted to PostLS4EndCaps 25/06/2020
 
-#ifndef ALICEO2_ENDCAPSLAYERS_GEOMETRYTGEO_H_
-#define ALICEO2_ENDCAPSLAYERS_GEOMETRYTGEO_H_
+#ifndef ALICEO2_EC0_GEOMETRYTGEO_H_
+#define ALICEO2_EC0_GEOMETRYTGEO_H_
 
 #include <TGeoMatrix.h> // for TGeoHMatrix
 #include <TObject.h>    // for TObject
@@ -24,7 +24,7 @@
 #include <vector>
 #include "DetectorsBase/GeometryManager.h"
 #include "DetectorsCommonDataFormats/DetID.h"
-#include "EndCapsBase/GeometryTGeo.h"
+#include "ITSMFTBase/GeometryTGeo.h"
 #include "MathUtils/Utils.h"
 #include "Rtypes.h" // for Int_t, Double_t, Bool_t, UInt_t, etc
 
@@ -32,7 +32,7 @@ class TGeoPNEntry;
 
 namespace o2
 {
-namespace ecl
+namespace ec0
 {
 /// GeometryTGeo is a simple interface class to TGeoManager. It is used in the simulation
 /// in order to query the TGeo EC0 geometry.
@@ -40,7 +40,7 @@ namespace ecl
 /// geometry, we need to check in every method if the structures are initialized. To be converted
 /// to singleton at later stage.
 
-class GeometryTGeo : public o2::endcaps::GeometryTGeo
+class GeometryTGeo : public o2::itsmft::GeometryTGeo
 {
  public:
   typedef o2::math_utils::Transform3D Mat3D;
@@ -80,7 +80,7 @@ class GeometryTGeo : public o2::endcaps::GeometryTGeo
   GeometryTGeo& operator=(const GeometryTGeo& geom) = delete;
 
   // implement filling of the matrix cache
-  using o2::endcaps::GeometryTGeo::fillMatrixCache;
+  using o2::itsmft::GeometryTGeo::fillMatrixCache;
   void fillMatrixCache(int mask) override;
 
   /// Exract EC0 parameters from TGeo
@@ -97,11 +97,11 @@ class GeometryTGeo : public o2::endcaps::GeometryTGeo
   static std::string sWrapperVolumeName; ///< Wrapper volume name
 
  private:
-  static std::unique_ptr<o2::ecl::GeometryTGeo> sInstance; ///< singletone instance
+  static std::unique_ptr<o2::ec0::GeometryTGeo> sInstance; ///< singletone instance
 
   ClassDefOverride(GeometryTGeo, 1); // EC0 geometry based on TGeo
 };
-} // namespace ecl
+} // namespace ec0
 } // namespace o2
 
 #endif

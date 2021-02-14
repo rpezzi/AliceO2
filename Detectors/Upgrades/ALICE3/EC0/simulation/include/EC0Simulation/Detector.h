@@ -11,14 +11,14 @@
 /// \file Detector.h
 /// \brief Definition of the Detector class
 
-#ifndef ALICEO2_ENDCAPSLAYERS_DETECTOR_H_
-#define ALICEO2_ENDCAPSLAYERS_DETECTOR_H_
+#ifndef ALICEO2_EC0_DETECTOR_H_
+#define ALICEO2_EC0_DETECTOR_H_
 
 #include <vector>                             // for vector
 #include "DetectorsBase/GeometryManager.h"    // for getSensID
 #include "DetectorsBase/Detector.h"           // for Detector
 #include "DetectorsCommonDataFormats/DetID.h" // for Detector
-#include "EndCapsSimulation/Hit.h"            // for Hit
+#include "ITSMFTSimulation/Hit.h"             // for Hit
 #include "Rtypes.h"                           // for Int_t, Double_t, Float_t, Bool_t, etc
 #include "TArrayD.h"                          // for TArrayD
 #include "TGeoManager.h"                      // for gGeoManager, TGeoManager (ptr only)
@@ -34,22 +34,14 @@ class TString;
 
 namespace o2
 {
-namespace endcaps
-{
-class Hit;
-}
-} // namespace o2
-
-namespace o2
-{
-namespace ecl
+namespace ec0
 {
 class GeometryTGeo;
 }
 } // namespace o2
 namespace o2
 {
-namespace ecl
+namespace ec0
 {
 class V3Layer;
 }
@@ -57,7 +49,7 @@ class V3Layer;
 
 namespace o2
 {
-namespace ecl
+namespace ec0
 {
 class V3Layer;
 
@@ -103,7 +95,7 @@ class Detector : public o2::base::DetImpl<Detector>
   void Register() override;
 
   /// Gets the produced collections
-  std::vector<o2::endcaps::Hit>* getHits(Int_t iColl) const
+  std::vector<o2::itsmft::Hit>* getHits(Int_t iColl) const
   {
     if (iColl == 0) {
       return mHits;
@@ -119,9 +111,9 @@ class Detector : public o2::base::DetImpl<Detector>
   void ConstructGeometry() override;
 
   /// This method is an example of how to add your own point of type Hit to the clones array
-  o2::endcaps::Hit* addHit(int trackID, int detID, const TVector3& startPos, const TVector3& endPos,
-                           const TVector3& startMom, double startE, double endTime, double eLoss,
-                           unsigned char startStatus, unsigned char endStatus);
+  o2::itsmft::Hit* addHit(int trackID, int detID, const TVector3& startPos, const TVector3& endPos,
+                          const TVector3& startMom, double startE, double endTime, double eLoss,
+                          unsigned char startStatus, unsigned char endStatus);
 
   /// Set per wrapper volume parameters
   void defineWrapperVolume(Int_t id, Double_t rmin, Double_t rmax, Double_t zspan) override;
@@ -181,7 +173,7 @@ class Detector : public o2::base::DetImpl<Detector>
   Int_t mBuildLevel[sNumberLayers];           //! Vector of Material Budget Studies
 
   /// Container for hit data
-  std::vector<o2::endcaps::Hit>* mHits;
+  std::vector<o2::itsmft::Hit>* mHits;
 
   /// Create the detector materials
   virtual void createMaterials();
@@ -207,7 +199,7 @@ class Detector : public o2::base::DetImpl<Detector>
 std::ostream& operator<<(std::ostream& os, Detector& source);
 
 std::istream& operator>>(std::istream& os, Detector& source);
-} // namespace ecl
+} // namespace ec0
 } // namespace o2
 
 #ifdef USESHM
@@ -216,7 +208,7 @@ namespace o2
 namespace base
 {
 template <>
-struct UseShm<o2::ecl::Detector> {
+struct UseShm<o2::ec0::Detector> {
   static constexpr bool value = true;
 };
 } // namespace base

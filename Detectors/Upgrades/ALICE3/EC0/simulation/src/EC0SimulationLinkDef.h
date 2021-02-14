@@ -8,14 +8,15 @@
 // granted to it by virtue of its status as an Intergovernmental Organization
 // or submit itself to any jurisdiction.
 
-/// \file GeometryTGeo.cxx : common base for PostLS4 Endcaps interface to TGeometry
-/// \brief Implementation of the GeometryTGeo class
-/// \author cvetan.cheshkov@cern.ch - 15/02/2007
-/// \author ruben.shahoyan@cern.ch - adapted to ITSupg 18/07/2012
-/// \author rafael.pezzi@cern.ch - adapted to PostLS4EndCaps 25/06/2020
+#ifdef __CLING__
 
-#include "EndCapsBase/GeometryTGeo.h"
+#pragma link off all globals;
+#pragma link off all classes;
+#pragma link off all functions;
 
-ClassImp(o2::endcaps::GeometryTGeo);
+#pragma link C++ class o2::ec0::V11Geometry + ;
+#pragma link C++ class o2::ec0::V3Layer + ;
+#pragma link C++ class o2::ec0::Detector + ;
+#pragma link C++ class o2::base::DetImpl < o2::ec0::Detector> + ;
 
-using namespace o2::endcaps;
+#endif

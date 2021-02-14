@@ -160,13 +160,6 @@ namespace tpc
 class HitGroup;
 }
 
-#ifdef ENABLE_UPGRADES
-namespace endcaps
-{
-class Hit;
-}
-#endif
-
 namespace detectors
 {
 
@@ -241,7 +234,7 @@ struct DetIDToHitTypes<o2::detectors::DetID::TRK> {
 };
 template <>
 struct DetIDToHitTypes<o2::detectors::DetID::EC0> {
-  using HitType = o2::endcaps::Hit;
+  using HitType = o2::itsmft::Hit;
 };
 #endif
 

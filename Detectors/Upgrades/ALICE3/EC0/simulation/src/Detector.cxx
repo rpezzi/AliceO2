@@ -11,8 +11,8 @@
 /// \file Detector.cxx
 /// \brief Implementation of the Detector class
 
-#include "EndCapsSimulation/Hit.h"
-#include "ECLayersBase/GeometryTGeo.h"
+#include "ITSMFTSimulation/Hit.h"
+#include "EC0Base/GeometryTGeo.h"
 #include "EC0Simulation/Detector.h"
 #include "EC0Simulation/V3Layer.h"
 
@@ -47,8 +47,8 @@ class TParticle;
 using std::cout;
 using std::endl;
 
-using namespace o2::ecl;
-using o2::endcaps::Hit;
+using namespace o2::ec0;
+using o2::itsmft::Hit;
 
 Detector::Detector()
   : o2::base::DetImpl<Detector>("EC0", kTRUE),
@@ -72,7 +72,7 @@ static double radii2Turbo(double rMin, double rMid, double rMax, double sensW)
   return TMath::ASin((rMax * rMax - rMin * rMin) / (2 * rMid * sensW)) * TMath::RadToDeg();
 }
 
-static void configEC0(Detector* ecl)
+static void configEC0(Detector* ec0)
 {
   // build EC0 upgrade detector
 }
@@ -80,13 +80,6 @@ static void configEC0(Detector* ecl)
 Detector::Detector(Bool_t active)
   : o2::base::DetImpl<Detector>("EC0", active),
     mTrackData(),
-    /*
-    mHitStarted(false),
-    mTrkStatusStart(),
-    mPositionStart(),
-    mMomentumStart(),
-    mEnergyLoss(),
-    */
     mNumberOfDetectors(-1),
     mModifyGeometry(kFALSE),
     mHits(o2::utils::createSimVector<Hit>())
@@ -586,4 +579,4 @@ std::istream& operator>>(std::istream& is, Detector& r)
   return is;
 }
 
-ClassImp(o2::ecl::Detector);
+ClassImp(o2::ec0::Detector);

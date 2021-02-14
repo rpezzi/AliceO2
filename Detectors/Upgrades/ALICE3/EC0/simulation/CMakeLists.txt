@@ -12,9 +12,8 @@ o2_add_library(EC0Simulation
                SOURCES src/V11Geometry.cxx
                        src/V3Layer.cxx
                        src/Detector.cxx
-               PUBLIC_LINK_LIBRARIES O2::ECLayersBase
-                                     O2::EndCapsSimulation
-                                     O2::EndCapsBase
+               PUBLIC_LINK_LIBRARIES O2::EC0Base
+                                     O2::ITSMFTSimulation
                                      ROOT::Physics)
 
 o2_target_root_dictionary(EC0Simulation

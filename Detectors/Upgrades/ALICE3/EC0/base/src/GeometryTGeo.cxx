@@ -16,7 +16,7 @@
 
 // ATTENTION: In opposite to old AliITSgeomTGeo, all indices start from 0, not from 1!!!
 
-#include "ECLayersBase/GeometryTGeo.h"
+#include "EC0Base/GeometryTGeo.h"
 #include "DetectorsBase/GeometryManager.h"
 #include "MathUtils/Cartesian.h"
 
@@ -41,25 +41,25 @@
 #include <cstring> // for strstr, strlen
 
 using namespace TMath;
-using namespace o2::ecl;
+using namespace o2::ec0;
 using namespace o2::detectors;
 
-ClassImp(o2::ecl::GeometryTGeo);
+ClassImp(o2::ec0::GeometryTGeo);
 
-std::unique_ptr<o2::ecl::GeometryTGeo> GeometryTGeo::sInstance;
+std::unique_ptr<o2::ec0::GeometryTGeo> GeometryTGeo::sInstance;
 
 std::string GeometryTGeo::sVolumeName = "EC0V";               ///< Mother volume name
 std::string GeometryTGeo::sLayerName = "EC0ULayer";           ///< Layer name
 std::string GeometryTGeo::sWrapperVolumeName = "EC0UWrapVol"; ///< Wrapper volume name
 
 //__________________________________________________________________________
-GeometryTGeo::GeometryTGeo(bool build, int loadTrans) : o2::endcaps::GeometryTGeo(DetID::EC0)
+GeometryTGeo::GeometryTGeo(bool build, int loadTrans) : o2::itsmft::GeometryTGeo(DetID::EC0)
 {
   // default c-tor, if build is true, the structures will be filled and the transform matrices
   // will be cached
   if (sInstance) {
-    LOG(FATAL) << "Invalid use of public constructor: o2::ecl::GeometryTGeo instance exists";
-    // throw std::runtime_error("Invalid use of public constructor: o2::ecl::GeometryTGeo instance exists");
+    LOG(FATAL) << "Invalid use of public constructor: o2::ec0::GeometryTGeo instance exists";
+    // throw std::runtime_error("Invalid use of public constructor: o2::ec0::GeometryTGeo instance exists");
   }
 
   if (build) {

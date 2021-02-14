@@ -197,7 +197,7 @@ void build_geometry(FairRunSim* run = nullptr)
 
   if (isActivated("EC0")) {
     // EC0
-    auto ec0 = new o2::ecl::Detector(kTRUE);
+    auto ec0 = new o2::ec0::Detector(kTRUE);
     run->AddModule(ec0);
   }
 #endif

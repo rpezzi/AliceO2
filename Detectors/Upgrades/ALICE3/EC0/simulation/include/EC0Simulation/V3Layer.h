@@ -13,8 +13,8 @@
 /// \author Mario Sitta <sitta@to.infn.it>
 /// \author Chinorat Kobdaj (kobdaj@g.sut.ac.th)
 
-#ifndef ALICEO2_ENDCAPSLAYERS_UPGRADEV3LAYER_H_
-#define ALICEO2_ENDCAPSLAYERS_UPGRADEV3LAYER_H_
+#ifndef ALICEO2_EC0_UPGRADEV3LAYER_H_
+#define ALICEO2_EC0_UPGRADEV3LAYER_H_
 
 #include <TGeoManager.h>               // for gGeoManager
 #include "Rtypes.h"                    // for Double_t, Int_t, Bool_t, etc
@@ -29,7 +29,7 @@ class TGeoVolume; // lines 15-15
 
 namespace o2
 {
-namespace ecl
+namespace ec0
 {
 
 /// This class defines the Geometry for the ITS  using TGeo. This is a work class used
@@ -101,7 +101,7 @@ class V3Layer : public V11Geometry
 
   ClassDefOverride(V3Layer, 0); // ITS v3 geometry
 };
-} // namespace ecl
+} // namespace ec0
 } // namespace o2
 
 #endif

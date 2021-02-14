@@ -14,7 +14,6 @@
 #pragma link off all classes;
 #pragma link off all functions;
 
-#pragma link C++ class o2::endcaps::Hit + ;
-#pragma link C++ class std::vector < o2::endcaps::Hit> + ;
+#pragma link C++ class o2::ec0::GeometryTGeo;
 
 #endif

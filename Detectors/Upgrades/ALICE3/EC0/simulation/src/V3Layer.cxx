@@ -14,7 +14,7 @@
 /// \author Chinorat Kobdaj (kobdaj@g.sut.ac.th)
 
 #include "EC0Simulation/V3Layer.h"
-#include "ECLayersBase/GeometryTGeo.h"
+#include "EC0Base/GeometryTGeo.h"
 #include "EC0Simulation/Detector.h"
 
 #include "FairLogger.h" // for LOG
@@ -38,8 +38,8 @@
 class TGeoMedium;
 
 using namespace TMath;
-using namespace o2::ecl;
-using namespace o2::endcaps;
+using namespace o2::ec0;
+using namespace o2::itsmft;
 
 ClassImp(V3Layer);
 
