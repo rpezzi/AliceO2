@@ -79,16 +79,19 @@ class GeometryTGeo : public o2::endcaps::GeometryTGeo
   GeometryTGeo(const GeometryTGeo& src) = delete;
   GeometryTGeo& operator=(const GeometryTGeo& geom) = delete;
 
+  // implement filling of the matrix cache
+  using o2::endcaps::GeometryTGeo::fillMatrixCache;
+  void fillMatrixCache(int mask) override;
+
   /// Exract EC0 parameters from TGeo
   void Build(int loadTrans = 0) override;
 
   void Print(Option_t* opt = "") const;
 
-
  protected:
   static constexpr int MAXLAYERS = 15; ///< max number of active layers
 
-  Int_t mNumberOfLayers;                       ///< number of layers
+  Int_t mNumberOfLayers;                 ///< number of layers
   static std::string sVolumeName;        ///< Mother volume name
   static std::string sLayerName;         ///< Layer name
   static std::string sWrapperVolumeName; ///< Wrapper volume name

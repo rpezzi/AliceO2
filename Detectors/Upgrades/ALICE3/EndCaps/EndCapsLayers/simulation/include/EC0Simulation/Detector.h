@@ -60,7 +60,6 @@ namespace o2
 namespace ecl
 {
 class V3Layer;
-class V3Services;
 
 class Detector : public o2::base::DetImpl<Detector>
 {
@@ -119,58 +118,6 @@ class Detector : public o2::base::DetImpl<Detector>
   /// Base class to create the detector geometry
   void ConstructGeometry() override;
 
-  /// Creates the Service Barrel (as a simple cylinder) for IB and OB
-  /// \param innerBarrel if true, build IB service barrel, otherwise for OB
-  /// \param dest the mother volume holding the service barrel
-  /// \param mgr  the gGeoManager pointer (used to get the material)
-  void createServiceBarrel(const Bool_t innerBarrel, TGeoVolume* dest, const TGeoManager* mgr = gGeoManager);
-
-  /// Sets the layer parameters
-  /// \param nlay layer number
-  /// \param phi0 layer phi0
-  /// \param r layer radius
-  /// \param nstav number of staves
-  /// \param nunit IB: number of chips per stave
-  /// \param OB: number of modules per half stave
-  /// \param lthick stave thickness (if omitted, defaults to 0)
-  /// \param dthick detector thickness (if omitted, defaults to 0)
-  /// \param dettypeID ??
-  /// \param buildLevel (if 0, all geometry is build, used for material budget studies)
-  void defineLayer(Int_t nlay, Double_t phi0, Double_t r, Int_t nladd, Int_t nmod, Double_t lthick = 0.,
-                   Double_t dthick = 0., UInt_t detType = 0, Int_t buildFlag = 0) override;
-
-  /// Sets the layer parameters for a "turbo" layer
-  /// (i.e. a layer whose staves overlap in phi)
-  /// \param nlay layer number
-  /// \param phi0 phi of 1st stave
-  /// \param r layer radius
-  /// \param nstav number of staves
-  /// \param nunit IB: number of chips per stave
-  /// \param OB: number of modules per half stave
-  /// \param width stave width
-  /// \param tilt layer tilt angle (degrees)
-  /// \param lthick stave thickness (if omitted, defaults to 0)
-  /// \param dthick detector thickness (if omitted, defaults to 0)
-  /// \param dettypeID ??
-  /// \param buildLevel (if 0, all geometry is build, used for material budget studies)
-  void defineLayerTurbo(Int_t nlay, Double_t phi0, Double_t r, Int_t nladd, Int_t nmod, Double_t width, Double_t tilt,
-                        Double_t lthick = 0., Double_t dthick = 0., UInt_t detType = 0, Int_t buildFlag = 0) override;
-
-  /// Gets the layer parameters
-  /// \param nlay layer number
-  /// \param phi0 phi of 1st stave
-  /// \param r layer radius
-  /// \param nstav number of staves
-  /// \param nmod IB: number of chips per stave
-  /// \param OB: number of modules per half stave
-  /// \param width stave width
-  /// \param tilt stave tilt angle
-  /// \param lthick stave thickness
-  /// \param dthick detector thickness
-  /// \param dettype detector type
-  virtual void getLayerParameters(Int_t nlay, Double_t& phi0, Double_t& r, Int_t& nladd, Int_t& nmod, Double_t& width,
-                                  Double_t& tilt, Double_t& lthick, Double_t& mthick, UInt_t& dettype) const;
-
   /// This method is an example of how to add your own point of type Hit to the clones array
   o2::endcaps::Hit* addHit(int trackID, int detID, const TVector3& startPos, const TVector3& endPos,
                            const TVector3& startMom, double startE, double endTime, double eLoss,
@@ -181,51 +128,6 @@ class Detector : public o2::base::DetImpl<Detector>
 
   /// Add alignable top volumes
   void addAlignableVolumes() const override;
-
-  /// Add alignable Layer volumes
-  /// \param lr layer number
-  /// \param parent path of the parent volume
-  /// \param lastUID on output, UID of the last volume
-  void addAlignableVolumesLayer(Int_t lr, TString& parent, Int_t& lastUID) const;
-
-  /// Add alignable Stave volumes
-  /// \param lr layer number
-  /// \param st stave number
-  /// \param parent path of the parent volume
-  /// \param lastUID on output, UID of the last volume
-  void addAlignableVolumesStave(Int_t lr, Int_t st, TString& parent, Int_t& lastUID) const;
-
-  /// Add alignable HalfStave volumes
-  /// \param lr layer number
-  /// \param st stave number
-  /// \param hst half stave number
-  /// \param parent path of the parent volume
-  /// \param lastUID on output, UID of the last volume
-  void addAlignableVolumesHalfStave(Int_t lr, Int_t st, Int_t hst, TString& parent, Int_t& lastUID) const;
-
-  /// Add alignable Module volumes
-  /// \param lr layer number
-  /// \param st stave number
-  /// \param hst half stave number
-  /// \param md module number
-  /// \param parent path of the parent volume
-  /// \param lastUID on output, UID of the last volume
-  void addAlignableVolumesModule(Int_t lr, Int_t st, Int_t hst, Int_t md, TString& parent, Int_t& lastUID) const;
-
-  /// Add alignable Chip volumes
-  /// \param lr layer number
-  /// \param st stave number
-  /// \param hst half stave number
-  /// \param md module number
-  /// \param ch chip number
-  /// \param parent path of the parent volume
-  /// \param lastUID on output, UID of the last volume
-  void addAlignableVolumesChip(Int_t lr, Int_t st, Int_t hst, Int_t md, Int_t ch, TString& parent,
-                               Int_t& lastUID) const;
-
-  /// Return Chip Volume UID
-  /// \param id volume id
-  Int_t chipVolUID(Int_t id) const { return o2::base::GeometryManager::getSensID(o2::detectors::DetID::EC0, id); }
 
   void EndOfEvent() override;
 
@@ -244,10 +146,6 @@ class Detector : public o2::base::DetImpl<Detector>
 
   /// Returns the number of layers
   Int_t getNumberOfLayers() const { return sNumberLayers; }
-  virtual void setStaveModelIB(Model model) { mStaveModelInnerBarrel = model; }
-  virtual void setStaveModelOB(Model model) { mStaveModelOuterBarrel = model; }
-  virtual Model getStaveModelIB() const { return mStaveModelInnerBarrel; }
-  virtual Model getStaveModelOB() const { return mStaveModelOuterBarrel; }
 
   GeometryTGeo* mGeometryTGeo; //! access to geometry details
 
@@ -277,20 +175,13 @@ class Detector : public o2::base::DetImpl<Detector>
   Bool_t mTurboLayer[sNumberLayers];          //! True for "turbo" layers
   Double_t mLayerPhi0[sNumberLayers];         //! Vector of layer's 1st stave phi in lab
   Double_t mLayerRadii[sNumberLayers];        //! Vector of layer radii
-  Int_t mStavePerLayer[sNumberLayers];        //! Vector of number of staves per layer
-  Int_t mUnitPerStave[sNumberLayers];         //! Vector of number of "units" per stave
   Double_t mChipThickness[sNumberLayers];     //! Vector of chip thicknesses
-  Double_t mStaveWidth[sNumberLayers];        //! Vector of stave width (only used for turbo)
-  Double_t mStaveTilt[sNumberLayers];         //! Vector of stave tilt (only used for turbo)
   Double_t mDetectorThickness[sNumberLayers]; //! Vector of detector thicknesses
   UInt_t mChipTypeID[sNumberLayers];          //! Vector of detector type id
   Int_t mBuildLevel[sNumberLayers];           //! Vector of Material Budget Studies
 
   /// Container for hit data
   std::vector<o2::endcaps::Hit>* mHits;
-
-  /// Creates an air-filled wrapper cylindrical volume
-  TGeoVolume* createWrapperVolume(const Int_t nLay);
 
   /// Create the detector materials
   virtual void createMaterials();
@@ -301,30 +192,11 @@ class Detector : public o2::base::DetImpl<Detector>
   /// Define the sensitive volumes of the geometry
   void defineSensitiveVolumes();
 
-  /// Creates the Inner Barrel Services
-  /// \param motherVolume the TGeoVolume owing the volume structure
-  void createInnerBarrelServices(TGeoVolume* motherVolume);
-
-  /// Creates the Middle Barrel Services
-  /// \param motherVolume the TGeoVolume owing the volume structure
-  void createMiddlBarrelServices(TGeoVolume* motherVolume);
-
-  /// Creates the Outer Barrel Services
-  /// \param motherVolume the TGeoVolume owing the volume structure
-  void createOuterBarrelServices(TGeoVolume* motherVolume);
-
-  /// Creates the Outer Barrel Supports
-  /// \param motherVolume the TGeoVolume owing the volume supports
-  void createOuterBarrelSupports(TGeoVolume* motherVolume);
-
   Detector(const Detector&);
 
   Detector& operator=(const Detector&);
 
-  Model mStaveModelInnerBarrel;      //! The stave model for the Inner Barrel
-  Model mStaveModelOuterBarrel;      //! The stave model for the Outer Barrel
   V3Layer* mGeometry[sNumberLayers]; //! Geometry
-  V3Services* mServicesGeometry;     //! Services Geometry
 
   template <typename Det>
   friend class o2::base::DetImpl;

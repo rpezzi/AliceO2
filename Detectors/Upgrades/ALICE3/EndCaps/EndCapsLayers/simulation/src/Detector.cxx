@@ -11,12 +11,10 @@
 /// \file Detector.cxx
 /// \brief Implementation of the Detector class
 
-#include "EndCapsBase/SegmentationAlpide.h"
 #include "EndCapsSimulation/Hit.h"
 #include "ECLayersBase/GeometryTGeo.h"
 #include "EC0Simulation/Detector.h"
 #include "EC0Simulation/V3Layer.h"
-#include "EC0Simulation/V3Services.h"
 
 #include "SimulationDataFormat/Stack.h"
 #include "SimulationDataFormat/TrackReference.h"
@@ -49,7 +47,6 @@ class TParticle;
 using std::cout;
 using std::endl;
 
-using Segmentation = o2::endcaps::SegmentationAlpide;
 using namespace o2::ecl;
 using o2::endcaps::Hit;
 
@@ -65,9 +62,7 @@ Detector::Detector()
     */
     mNumberOfDetectors(-1),
     mModifyGeometry(kFALSE),
-    mHits(o2::utils::createSimVector<Hit>()),
-    mStaveModelInnerBarrel(kIBModel0),
-    mStaveModelOuterBarrel(kOBModel0)
+    mHits(o2::utils::createSimVector<Hit>())
 {
 }
 
@@ -80,66 +75,6 @@ static double radii2Turbo(double rMin, double rMid, double rMax, double sensW)
 static void configEC0(Detector* ecl)
 {
   // build EC0 upgrade detector
-  const int kNLr = 7;
-  const int kNLrInner = 3;
-  const int kBuildLevel = 0;
-  const int kSensTypeID = 0; // dummy id for Alpide sensor
-
-  const float ChipThicknessIB = 50.e-4;
-  const float ChipThicknessOB = 100.e-4;
-
-  enum { kRmn,
-         kRmd,
-         kRmx,
-         kNModPerStave,
-         kPhi0,
-         kNStave,
-         kNPar };
-  // Radii are from last TDR (ALICE-TDR-017.pdf Tab. 1.1, rMid is mean value)
-  const double tdr5dat[kNLr][kNPar] = {
-    {2.24, 2.34, 2.67, 9., 16.42, 12}, // for each inner layer: rMin,rMid,rMax,NChip/Stave, phi0, nStaves
-    {3.01, 3.15, 3.46, 9., 12.18, 16},
-    {3.78, 3.93, 4.21, 9., 9.55, 20},
-    {-1, 19.6, -1, 4., 0., 24},  // for others: -, rMid, -, NMod/HStave, phi0, nStaves // 24 was 49
-    {-1, 24.55, -1, 4., 0., 30}, // 30 was 61
-    {-1, 34.39, -1, 7., 0., 42}, // 42 was 88
-    {-1, 39.34, -1, 7., 0., 48}  // 48 was 100
-  };
-  const int nChipsPerModule = 7;  // For OB: how many chips in a row
-  const double zChipGap = 0.01;   // For OB: gap in Z between chips
-  const double zModuleGap = 0.01; // For OB: gap in Z between modules
-
-  double dzLr, rLr, phi0, turbo;
-  int nStaveLr, nModPerStaveLr;
-
-  ecl->setStaveModelIB(o2::ecl::Detector::kIBModel4);
-  ecl->setStaveModelOB(o2::ecl::Detector::kOBModel2);
-
-  const int kNWrapVol = 3;
-  const double wrpRMin[kNWrapVol] = {2.1, 19.3, 33.32};
-  const double wrpRMax[kNWrapVol] = {15.4, 29.14, 46.0};
-  const double wrpZSpan[kNWrapVol] = {70., 93., 163.6};
-
-  for (int iw = 0; iw < kNWrapVol; iw++) {
-    ecl->defineWrapperVolume(iw, wrpRMin[iw], wrpRMax[iw], wrpZSpan[iw]);
-  }
-
-  for (int idLr = 0; idLr < kNLr; idLr++) {
-    rLr = tdr5dat[idLr][kRmd];
-    phi0 = tdr5dat[idLr][kPhi0];
-
-    nStaveLr = TMath::Nint(tdr5dat[idLr][kNStave]);
-    nModPerStaveLr = TMath::Nint(tdr5dat[idLr][kNModPerStave]);
-    int nChipsPerStaveLr = nModPerStaveLr;
-    if (idLr >= kNLrInner) {
-      ecl->defineLayer(idLr, phi0, rLr, nStaveLr, nModPerStaveLr, ChipThicknessOB, Segmentation::SensorLayerThickness,
-                       kSensTypeID, kBuildLevel);
-    } else {
-      turbo = radii2Turbo(tdr5dat[idLr][kRmn], rLr, tdr5dat[idLr][kRmx], Segmentation::SensorSizeRows);
-      ecl->defineLayerTurbo(idLr, phi0, rLr, nStaveLr, nChipsPerStaveLr, Segmentation::SensorSizeRows, turbo,
-                            ChipThicknessIB, Segmentation::SensorLayerThickness, kSensTypeID, kBuildLevel);
-    }
-  }
 }
 
 Detector::Detector(Bool_t active)
@@ -154,35 +89,8 @@ Detector::Detector(Bool_t active)
     */
     mNumberOfDetectors(-1),
     mModifyGeometry(kFALSE),
-    mHits(o2::utils::createSimVector<Hit>()),
-    mStaveModelInnerBarrel(kIBModel0),
-    mStaveModelOuterBarrel(kOBModel0)
+    mHits(o2::utils::createSimVector<Hit>())
 {
-
-  for (Int_t j = 0; j < sNumberLayers; j++) {
-    mLayerName[j].Form("%s%d", GeometryTGeo::getEC0SensorPattern(), j); // See V3Layer
-  }
-
-  if (sNumberLayers > 0) { // if not, we'll Fatal-ize in CreateGeometry
-    for (Int_t j = 0; j < sNumberLayers; j++) {
-      mLayerPhi0[j] = 0;
-      mLayerRadii[j] = 0.;
-      mStavePerLayer[j] = 0;
-      mUnitPerStave[j] = 0;
-      mChipThickness[j] = 0.;
-      mStaveWidth[j] = 0.;
-      mStaveTilt[j] = 0.;
-      mDetectorThickness[j] = 0.;
-      mChipTypeID[j] = 0;
-      mBuildLevel[j] = 0;
-      mGeometry[j] = nullptr;
-    }
-  }
-  mServicesGeometry = nullptr;
-
-  for (int i = sNumberOfWrapperVolumes; i--;) {
-    mWrapperMinRadius[i] = mWrapperMaxRadius[i] = mWrapperZSpan[i] = -1;
-  }
 
   configEC0(this);
 }
@@ -201,14 +109,8 @@ Detector::Detector(const Detector& rhs)
     mModifyGeometry(rhs.mModifyGeometry),
 
     /// Container for data points
-    mHits(o2::utils::createSimVector<Hit>()),
-    mStaveModelInnerBarrel(rhs.mStaveModelInnerBarrel),
-    mStaveModelOuterBarrel(rhs.mStaveModelOuterBarrel)
+    mHits(o2::utils::createSimVector<Hit>())
 {
-
-  for (Int_t j = 0; j < sNumberLayers; j++) {
-    mLayerName[j].Form("%s%d", GeometryTGeo::getEC0SensorPattern(), j); // See V3Layer
-  }
 }
 
 Detector::~Detector()
@@ -243,13 +145,6 @@ Detector& Detector::operator=(const Detector& rhs)
 
   /// Container for data points
   mHits = nullptr;
-
-  mStaveModelInnerBarrel = rhs.mStaveModelInnerBarrel;
-  mStaveModelOuterBarrel = rhs.mStaveModelOuterBarrel;
-
-  for (Int_t j = 0; j < sNumberLayers; j++) {
-    mLayerName[j].Form("%s%d", GeometryTGeo::getEC0SensorPattern(), j); // See V3Layer
-  }
 
   return *this;
 }
@@ -339,12 +234,8 @@ Bool_t Detector::ProcessHits(FairVolume* vol)
     TLorentzVector positionStop;
     fMC->TrackPosition(positionStop);
     // Retrieve the indices with the volume path
-    int stave(0), halfstave(0), chipinmodule(0), module;
-    fMC->CurrentVolOffID(1, chipinmodule);
-    fMC->CurrentVolOffID(2, module);
-    fMC->CurrentVolOffID(3, halfstave);
-    fMC->CurrentVolOffID(4, stave);
-    int chipindex = mGeometryTGeo->getChipIndex(lay, stave, halfstave, module, chipinmodule);
+    int stave(0), halfstave(0), chipinmodule(0), module(0);
+    int chipindex = 0;
 
     Hit* p = addHit(stack->GetCurrentTrackNumber(), chipindex, mTrackData.mPositionStart.Vect(), positionStop.Vect(),
                     mTrackData.mMomentumStart.Vect(), mTrackData.mMomentumStart.E(), positionStop.T(),
@@ -573,193 +464,6 @@ void Detector::defineWrapperVolume(Int_t id, Double_t rmin, Double_t rmax, Doubl
   mWrapperZSpan[id] = zspan;
 }
 
-void Detector::defineLayer(Int_t nlay, double phi0, Double_t r, Int_t nstav, Int_t nunit, Double_t lthick,
-                           Double_t dthick, UInt_t dettypeID, Int_t buildLevel)
-{
-  //     Sets the layer parameters
-  // Inputs:
-  //          nlay    layer number
-  //          phi0    layer phi0
-  //          r       layer radius
-  //          nstav   number of staves
-  //          nunit   IB: number of chips per stave
-  //                  OB: number of modules per half stave
-  //          lthick  stave thickness (if omitted, defaults to 0)
-  //          dthick  detector thickness (if omitted, defaults to 0)
-  //          dettypeID  ??
-  //          buildLevel (if 0, all geometry is build, used for material budget studies)
-  // Outputs:
-  //   none.
-  // Return:
-  //   none.
-
-  LOG(INFO) << "L# " << nlay << " Phi:" << phi0 << " R:" << r << " Nst:" << nstav << " Nunit:" << nunit
-            << " Lthick:" << lthick << " Dthick:" << dthick << " DetID:" << dettypeID << " B:" << buildLevel;
-
-  if (nlay >= sNumberLayers || nlay < 0) {
-    LOG(ERROR) << "Wrong layer number " << nlay;
-    return;
-  }
-
-  mTurboLayer[nlay] = kFALSE;
-  mLayerPhi0[nlay] = phi0;
-  mLayerRadii[nlay] = r;
-  mStavePerLayer[nlay] = nstav;
-  mUnitPerStave[nlay] = nunit;
-  mChipThickness[nlay] = lthick;
-  mDetectorThickness[nlay] = dthick;
-  mChipTypeID[nlay] = dettypeID;
-  mBuildLevel[nlay] = buildLevel;
-}
-
-void Detector::defineLayerTurbo(Int_t nlay, Double_t phi0, Double_t r, Int_t nstav, Int_t nunit, Double_t width,
-                                Double_t tilt, Double_t lthick, Double_t dthick, UInt_t dettypeID, Int_t buildLevel)
-{
-  //     Sets the layer parameters for a "turbo" layer
-  //     (i.e. a layer whose staves overlap in phi)
-  // Inputs:
-  //          nlay    layer number
-  //          phi0    phi of 1st stave
-  //          r       layer radius
-  //          nstav   number of staves
-  //          nunit   IB: number of chips per stave
-  //                  OB: number of modules per half stave
-  //          width   stave width
-  //          tilt    layer tilt angle (degrees)
-  //          lthick  stave thickness (if omitted, defaults to 0)
-  //          dthick  detector thickness (if omitted, defaults to 0)
-  //          dettypeID  ??
-  //          buildLevel (if 0, all geometry is build, used for material budget studies)
-  // Outputs:
-  //   none.
-  // Return:
-  //   none.
-
-  LOG(INFO) << "L# " << nlay << " Phi:" << phi0 << " R:" << r << " Nst:" << nstav << " Nunit:" << nunit
-            << " W:" << width << " Tilt:" << tilt << " Lthick:" << lthick << " Dthick:" << dthick
-            << " DetID:" << dettypeID << " B:" << buildLevel;
-
-  if (nlay >= sNumberLayers || nlay < 0) {
-    LOG(ERROR) << "Wrong layer number " << nlay;
-    return;
-  }
-
-  mTurboLayer[nlay] = kTRUE;
-  mLayerPhi0[nlay] = phi0;
-  mLayerRadii[nlay] = r;
-  mStavePerLayer[nlay] = nstav;
-  mUnitPerStave[nlay] = nunit;
-  mChipThickness[nlay] = lthick;
-  mStaveWidth[nlay] = width;
-  mStaveTilt[nlay] = tilt;
-  mDetectorThickness[nlay] = dthick;
-  mChipTypeID[nlay] = dettypeID;
-  mBuildLevel[nlay] = buildLevel;
-}
-
-void Detector::getLayerParameters(Int_t nlay, Double_t& phi0, Double_t& r, Int_t& nstav, Int_t& nmod, Double_t& width,
-                                  Double_t& tilt, Double_t& lthick, Double_t& dthick, UInt_t& dettype) const
-{
-  //     Gets the layer parameters
-  // Inputs:
-  //          nlay    layer number
-  // Outputs:
-  //          phi0    phi of 1st stave
-  //          r       layer radius
-  //          nstav   number of staves
-  //          nmod    IB: number of chips per stave
-  //                  OB: number of modules per half stave
-  //          width   stave width
-  //          tilt    stave tilt angle
-  //          lthick  stave thickness
-  //          dthick  detector thickness
-  //          dettype detector type
-  // Return:
-  //   none.
-
-  if (nlay >= sNumberLayers || nlay < 0) {
-    LOG(ERROR) << "Wrong layer number " << nlay;
-    return;
-  }
-
-  phi0 = mLayerPhi0[nlay];
-  r = mLayerRadii[nlay];
-  nstav = mStavePerLayer[nlay];
-  nmod = mUnitPerStave[nlay];
-  width = mStaveWidth[nlay];
-  tilt = mStaveTilt[nlay];
-  lthick = mChipThickness[nlay];
-  dthick = mDetectorThickness[nlay];
-  dettype = mChipTypeID[nlay];
-}
-
-TGeoVolume* Detector::createWrapperVolume(Int_t id)
-{
-  // Creates an air-filled wrapper cylindrical volume
-  // For OB a Pcon is needed to host the support rings
-  // while avoiding overlaps with MFT structures and OB cones
-
-  const Double_t suppRingAZlen = 4.;
-  const Double_t coneRingARmax = 33.96;
-  const Double_t coneRingAZlen = 5.6;
-  const Double_t suppRingCZlen[3] = {4.8, 4.0, 2.4};
-  const Double_t suppRingsRmin[3] = {23.35, 20.05, 35.4};
-
-  if (mWrapperMinRadius[id] < 0 || mWrapperMaxRadius[id] < 0 || mWrapperZSpan[id] < 0) {
-    LOG(FATAL) << "Wrapper volume " << id << " was requested but not defined";
-  }
-
-  // Now create the actual shape and volume
-  TGeoShape* tube;
-  Double_t zlen;
-  switch (id) {
-    case 0: // IB Layer 0,1,2: simple cylinder
-    {
-      TGeoTube* wrap = new TGeoTube(mWrapperMinRadius[id], mWrapperMaxRadius[id], mWrapperZSpan[id] / 2.);
-      tube = (TGeoShape*)wrap;
-    } break;
-    case 1: // MB Layer 3,4: complex Pcon to avoid MFT overlaps
-    {
-      TGeoPcon* wrap = new TGeoPcon(0, 360, 6);
-      zlen = mWrapperZSpan[id] / 2 + suppRingCZlen[0];
-      wrap->DefineSection(0, -zlen, suppRingsRmin[0], mWrapperMaxRadius[id]);
-      zlen = mWrapperZSpan[id] / 2 + suppRingCZlen[1];
-      wrap->DefineSection(1, -zlen, suppRingsRmin[0], mWrapperMaxRadius[id]);
-      wrap->DefineSection(2, -zlen, suppRingsRmin[1], mWrapperMaxRadius[id]);
-      wrap->DefineSection(3, -mWrapperZSpan[id] / 2., suppRingsRmin[1], mWrapperMaxRadius[id]);
-      wrap->DefineSection(4, -mWrapperZSpan[id] / 2., mWrapperMinRadius[id], mWrapperMaxRadius[id]);
-      zlen = mWrapperZSpan[id] / 2 + suppRingAZlen;
-      wrap->DefineSection(5, zlen, mWrapperMinRadius[id], mWrapperMaxRadius[id]);
-      tube = (TGeoShape*)wrap;
-    } break;
-    case 2: // OB Layer 5,6: simpler Pcon to avoid OB cones overlaps
-    {
-      TGeoPcon* wrap = new TGeoPcon(0, 360, 6);
-      zlen = mWrapperZSpan[id] / 2;
-      wrap->DefineSection(0, -zlen, suppRingsRmin[2], mWrapperMaxRadius[id]);
-      zlen -= suppRingCZlen[2];
-      wrap->DefineSection(1, -zlen, suppRingsRmin[2], mWrapperMaxRadius[id]);
-      wrap->DefineSection(2, -zlen, mWrapperMinRadius[id], mWrapperMaxRadius[id]);
-      zlen = mWrapperZSpan[id] / 2 - coneRingAZlen;
-      wrap->DefineSection(3, zlen, mWrapperMinRadius[id], mWrapperMaxRadius[id]);
-      wrap->DefineSection(4, zlen, coneRingARmax, mWrapperMaxRadius[id]);
-      wrap->DefineSection(5, mWrapperZSpan[id] / 2, coneRingARmax, mWrapperMaxRadius[id]);
-      tube = (TGeoShape*)wrap;
-    } break;
-    default: // Can never happen, keeps gcc quiet
-      break;
-  }
-
-  TGeoMedium* medAir = gGeoManager->GetMedium("EC0_AIR$");
-
-  char volnam[30];
-  snprintf(volnam, 29, "%s%d", GeometryTGeo::getEC0WrapVolPattern(), id);
-
-  auto* wrapper = new TGeoVolume(volnam, tube, medAir);
-
-  return wrapper;
-}
-
 void Detector::ConstructGeometry()
 {
   // Create the detector materials
@@ -779,422 +483,10 @@ void Detector::constructDetectorGeometry()
   if (!vALIC) {
     LOG(FATAL) << "Could not find the top volume";
   }
-
-  new TGeoVolumeAssembly(GeometryTGeo::getEC0VolPattern());
-  TGeoVolume* vEC0V = geoManager->GetVolume(GeometryTGeo::getEC0VolPattern());
-  vALIC->AddNode(vEC0V, 2, new TGeoTranslation(0, 30., 0)); // Copy number is 2 to cheat AliGeoManager::CheckSymNamesLUT
-
-  const Int_t kLength = 100;
-  Char_t vstrng[kLength] = "xxxRS"; //?
-  vEC0V->SetTitle(vstrng);
-
-  // Check that we have all needed parameters
-  for (Int_t j = 0; j < sNumberLayers; j++) {
-    if (mLayerRadii[j] <= 0) {
-      LOG(FATAL) << "Wrong layer radius for layer " << j << "(" << mLayerRadii[j] << ")";
-    }
-    if (mStavePerLayer[j] <= 0) {
-      LOG(FATAL) << "Wrong number of staves for layer " << j << "(" << mStavePerLayer[j] << ")";
-    }
-    if (mUnitPerStave[j] <= 0) {
-      LOG(FATAL) << "Wrong number of chips for layer " << j << "(" << mUnitPerStave[j] << ")";
-    }
-    if (mChipThickness[j] < 0) {
-      LOG(FATAL) << "Wrong chip thickness for layer " << j << "(" << mChipThickness[j] << ")";
-    }
-    if (mTurboLayer[j] && mStaveWidth[j] <= 0) {
-      LOG(FATAL) << "Wrong stave width for layer " << j << "(" << mStaveWidth[j] << ")";
-    }
-    if (mDetectorThickness[j] < 0) {
-      LOG(FATAL) << "Wrong Sensor thickness for layer " << j << "(" << mDetectorThickness[j] << ")";
-    }
-
-    if (j > 0) {
-      if (mLayerRadii[j] <= mLayerRadii[j - 1]) {
-        LOG(FATAL) << "Layer " << j << " radius (" << mLayerRadii[j] << ") is smaller than layer " << j - 1
-                   << " radius (" << mLayerRadii[j - 1] << ")";
-      }
-    }
-
-    if (mChipThickness[j] == 0) {
-      LOG(INFO) << "Chip thickness for layer " << j << " not set, using default";
-    }
-  }
-
-  // Create the wrapper volumes
-  TGeoVolume** wrapVols = nullptr;
-
-  if (sNumberOfWrapperVolumes) {
-    wrapVols = new TGeoVolume*[sNumberOfWrapperVolumes];
-    for (int id = 0; id < sNumberOfWrapperVolumes; id++) {
-      wrapVols[id] = createWrapperVolume(id);
-      vEC0V->AddNode(wrapVols[id], 1, nullptr);
-    }
-  }
-
-  // Now create the actual geometry
-  for (Int_t j = 0; j < sNumberLayers; j++) {
-    TGeoVolume* dest = vEC0V;
-    mWrapperLayerId[j] = -1;
-
-    if (mTurboLayer[j]) {
-      mGeometry[j] = new V3Layer(j, kTRUE, kFALSE);
-      mGeometry[j]->setStaveWidth(mStaveWidth[j]);
-      mGeometry[j]->setStaveTilt(mStaveTilt[j]);
-    } else {
-      mGeometry[j] = new V3Layer(j, kFALSE);
-    }
-
-    mGeometry[j]->setPhi0(mLayerPhi0[j]);
-    mGeometry[j]->setRadius(mLayerRadii[j]);
-    mGeometry[j]->setNumberOfStaves(mStavePerLayer[j]);
-    mGeometry[j]->setNumberOfUnits(mUnitPerStave[j]);
-    mGeometry[j]->setChipType(mChipTypeID[j]);
-    mGeometry[j]->setBuildLevel(mBuildLevel[j]);
-
-    if (j < sNumberInnerLayers) {
-      mGeometry[j]->setStaveModel(mStaveModelInnerBarrel);
-    } else {
-      mGeometry[j]->setStaveModel(mStaveModelOuterBarrel);
-    }
-
-    LOG(DEBUG1) << "mBuildLevel: " << mBuildLevel[j];
-
-    if (mChipThickness[j] != 0) {
-      mGeometry[j]->setChipThick(mChipThickness[j]);
-    }
-    if (mDetectorThickness[j] != 0) {
-      mGeometry[j]->setSensorThick(mDetectorThickness[j]);
-    }
-
-    for (int iw = 0; iw < sNumberOfWrapperVolumes; iw++) {
-      if (mLayerRadii[j] > mWrapperMinRadius[iw] && mLayerRadii[j] < mWrapperMaxRadius[iw]) {
-        LOG(DEBUG) << "Will embed layer " << j << " in wrapper volume " << iw;
-
-        dest = wrapVols[iw];
-        mWrapperLayerId[j] = iw;
-        break;
-      }
-    }
-    mGeometry[j]->createLayer(dest);
-  }
-
-  // Finally create the services
-  mServicesGeometry = new V3Services();
-
-  createInnerBarrelServices(wrapVols[0]);
-  createMiddlBarrelServices(wrapVols[1]);
-  createOuterBarrelServices(wrapVols[2]);
-  createOuterBarrelSupports(vEC0V);
-
-  // TEMPORARY - These routines will be obsoleted once the new services are completed - TEMPORARY
-  //  createServiceBarrel(kTRUE, wrapVols[0]);
-  //  createServiceBarrel(kFALSE, wrapVols[2]);
-
-  delete[] wrapVols; // delete pointer only, not the volumes
-}
-
-void Detector::createInnerBarrelServices(TGeoVolume* motherVolume)
-{
-  //
-  // Creates the Inner Barrel Service structures
-  //
-  // Input:
-  //         motherVolume : the volume hosting the services
-  //
-  // Output:
-  //
-  // Return:
-  //
-  // Created:      15 May 2019  Mario Sitta
-  //               (partially based on P.Namwongsa implementation in AliRoot)
-  // Updated:      19 Jun 2019  Mario Sitta  IB Side A added
-  // Updated:      21 Oct 2019  Mario Sitta  CYSS added
-  //
-
-  // Create the End Wheels on Side A
-  TGeoVolume* endWheelsA = mServicesGeometry->createIBEndWheelsSideA();
-
-  motherVolume->AddNode(endWheelsA, 1, nullptr);
-
-  // Create the End Wheels on Side C
-  TGeoVolume* endWheelsC = mServicesGeometry->createIBEndWheelsSideC();
-
-  motherVolume->AddNode(endWheelsC, 1, nullptr);
-
-  // Create the CYSS Assembly (i.e. the supporting half cylinder and cone)
-  TGeoVolume* cyss = mServicesGeometry->createCYSSAssembly();
-
-  motherVolume->AddNode(cyss, 1, nullptr);
-}
-
-void Detector::createMiddlBarrelServices(TGeoVolume* motherVolume)
-{
-  //
-  // Creates the Middle Barrel Service structures
-  //
-  // Input:
-  //         motherVolume : the volume hosting the services
-  //
-  // Output:
-  //
-  // Return:
-  //
-  // Created:      24 Sep 2019  Mario Sitta
-  //
-
-  // Create the End Wheels on Side A
-  mServicesGeometry->createMBEndWheelsSideA(motherVolume);
-
-  // Create the End Wheels on Side C
-  mServicesGeometry->createMBEndWheelsSideC(motherVolume);
-}
-
-void Detector::createOuterBarrelServices(TGeoVolume* motherVolume)
-{
-  //
-  // Creates the Outer Barrel Service structures
-  //
-  // Input:
-  //         motherVolume : the volume hosting the services
-  //
-  // Output:
-  //
-  // Return:
-  //
-  // Created:      27 Sep 2019  Mario Sitta
-  //
-
-  // Create the End Wheels on Side A
-  mServicesGeometry->createOBEndWheelsSideA(motherVolume);
-
-  // Create the End Wheels on Side C
-  mServicesGeometry->createOBEndWheelsSideC(motherVolume);
-}
-
-void Detector::createOuterBarrelSupports(TGeoVolume* motherVolume)
-{
-  //
-  // Creates the Outer Barrel Service structures
-  //
-  // Input:
-  //         motherVolume : the volume hosting the supports
-  //
-  // Output:
-  //
-  // Return:
-  //
-  // Created:      26 Jan 2020  Mario Sitta
-  //
-
-  // Create the Cone on Side A
-  mServicesGeometry->createOBConeSideA(motherVolume);
-
-  // Create the Cone on Side C
-  mServicesGeometry->createOBConeSideC(motherVolume);
-}
-
-// Service Barrel
-void Detector::createServiceBarrel(const Bool_t innerBarrel, TGeoVolume* dest, const TGeoManager* mgr)
-{
-  // Creates the Service Barrel (as a simple cylinder) for IB and OB
-  // Inputs:
-  //         innerBarrel : if true, build IB service barrel, otherwise for OB
-  //         dest        : the mother volume holding the service barrel
-  //         mgr         : the gGeoManager pointer (used to get the material)
-  //
-
-  Double_t rminIB = 4.7;
-  Double_t rminOB = 43.9;
-  Double_t zLenOB;
-  Double_t cInt = 0.22; // dimensioni cilindro di supporto interno
-  Double_t cExt = 1.00; // dimensioni cilindro di supporto esterno
-  //  Double_t phi1   =  180;
-  //  Double_t phi2   =  360;
-
-  TGeoMedium* medCarbonFleece = mgr->GetMedium("EC0_CarbonFleece$");
-
-  if (innerBarrel) {
-    zLenOB = ((TGeoTube*)(dest->GetShape()))->GetDz();
-    //    TGeoTube*ibSuppSh = new TGeoTubeSeg(rminIB,rminIB+cInt,zLenOB,phi1,phi2);
-    auto* ibSuppSh = new TGeoTube(rminIB, rminIB + cInt, zLenOB);
-    auto* ibSupp = new TGeoVolume("ibSuppCyl", ibSuppSh, medCarbonFleece);
-    dest->AddNode(ibSupp, 1);
-  } else {
-    zLenOB = ((TGeoTube*)(dest->GetShape()))->GetDz();
-    auto* obSuppSh = new TGeoTube(rminOB, rminOB + cExt, zLenOB);
-    auto* obSupp = new TGeoVolume("obSuppCyl", obSuppSh, medCarbonFleece);
-    dest->AddNode(obSupp, 1);
-  }
-
-  return;
 }
 
 void Detector::addAlignableVolumes() const
 {
-  //
-  // Creates entries for alignable volumes associating the symbolic volume
-  // name with the corresponding volume path.
-  //
-  // Created:      06 Mar 2018  Mario Sitta First version (mainly ported from AliRoot)
-  //
-
-  LOG(INFO) << "Add EC0 alignable volumes";
-
-  if (!gGeoManager) {
-    LOG(FATAL) << "TGeoManager doesn't exist !";
-    return;
-  }
-
-  TString path = Form("/cave_1/barrel_1/%s_2", GeometryTGeo::getEC0VolPattern());
-  TString sname = GeometryTGeo::composeSymNameEC0();
-
-  LOG(DEBUG) << sname << " <-> " << path;
-
-  if (!gGeoManager->SetAlignableEntry(sname.Data(), path.Data())) {
-    LOG(FATAL) << "Unable to set alignable entry ! " << sname << " : " << path;
-  }
-
-  Int_t lastUID = 0;
-  for (Int_t lr = 0; lr < sNumberLayers; lr++) {
-    addAlignableVolumesLayer(lr, path, lastUID);
-  }
-
-  return;
-}
-
-void Detector::addAlignableVolumesLayer(int lr, TString& parent, Int_t& lastUID) const
-{
-  //
-  // Add alignable volumes for a Layer and its daughters
-  //
-  // Created:      06 Mar 2018  Mario Sitta First version (mainly ported from AliRoot)
-  //
-
-  TString wrpV =
-    mWrapperLayerId[lr] != -1 ? Form("%s%d_1", GeometryTGeo::getEC0WrapVolPattern(), mWrapperLayerId[lr]) : "";
-  TString path = Form("%s/%s/%s%d_1", parent.Data(), wrpV.Data(), GeometryTGeo::getEC0LayerPattern(), lr);
-  TString sname = GeometryTGeo::composeSymNameLayer(lr);
-
-  LOG(DEBUG) << "Add " << sname << " <-> " << path;
-
-  if (!gGeoManager->SetAlignableEntry(sname.Data(), path.Data())) {
-    LOG(FATAL) << "Unable to set alignable entry ! " << sname << " : " << path;
-  }
-
-  const V3Layer* lrobj = mGeometry[lr];
-  Int_t nstaves = lrobj->getNumberOfStavesPerParent();
-  for (int st = 0; st < nstaves; st++) {
-    addAlignableVolumesStave(lr, st, path, lastUID);
-  }
-
-  return;
-}
-
-void Detector::addAlignableVolumesStave(Int_t lr, Int_t st, TString& parent, Int_t& lastUID) const
-{
-  //
-  // Add alignable volumes for a Stave and its daughters
-  //
-  // Created:      06 Mar 2018  Mario Sitta First version (mainly ported from AliRoot)
-  //
-
-  TString path = Form("%s/%s%d_%d", parent.Data(), GeometryTGeo::getEC0StavePattern(), lr, st);
-  TString sname = GeometryTGeo::composeSymNameStave(lr, st);
-
-  LOG(DEBUG) << "Add " << sname << " <-> " << path;
-
-  if (!gGeoManager->SetAlignableEntry(sname.Data(), path.Data())) {
-    LOG(FATAL) << "Unable to set alignable entry ! " << sname << " : " << path;
-  }
-
-  const V3Layer* lrobj = mGeometry[lr];
-  Int_t nhstave = lrobj->getNumberOfHalfStavesPerParent();
-  Int_t start = nhstave > 0 ? 0 : -1;
-  for (Int_t sst = start; sst < nhstave; sst++) {
-    addAlignableVolumesHalfStave(lr, st, sst, path, lastUID);
-  }
-
-  return;
-}
-
-void Detector::addAlignableVolumesHalfStave(Int_t lr, Int_t st, Int_t hst, TString& parent, Int_t& lastUID) const
-{
-  //
-  // Add alignable volumes for a HalfStave (if any) and its daughters
-  //
-  // Created:      06 Mar 2018  Mario Sitta First version (mainly ported from AliRoot)
-  //
-
-  TString path = parent;
-  if (hst >= 0) {
-    path = Form("%s/%s%d_%d", parent.Data(), GeometryTGeo::getEC0HalfStavePattern(), lr, hst);
-    TString sname = GeometryTGeo::composeSymNameHalfStave(lr, st, hst);
-
-    LOG(DEBUG) << "Add " << sname << " <-> " << path;
-
-    if (!gGeoManager->SetAlignableEntry(sname.Data(), path.Data())) {
-      LOG(FATAL) << "Unable to set alignable entry ! " << sname << " : " << path;
-    }
-  }
-
-  const V3Layer* lrobj = mGeometry[lr];
-  Int_t nmodules = lrobj->getNumberOfModulesPerParent();
-  Int_t start = nmodules > 0 ? 0 : -1;
-  for (Int_t md = start; md < nmodules; md++) {
-    addAlignableVolumesModule(lr, st, hst, md, path, lastUID);
-  }
-
-  return;
-}
-
-void Detector::addAlignableVolumesModule(Int_t lr, Int_t st, Int_t hst, Int_t md, TString& parent, Int_t& lastUID) const
-{
-  //
-  // Add alignable volumes for a Module (if any) and its daughters
-  //
-  // Created:      06 Mar 2018  Mario Sitta First version (mainly ported from AliRoot)
-  //
-
-  TString path = parent;
-  if (md >= 0) {
-    path = Form("%s/%s%d_%d", parent.Data(), GeometryTGeo::getEC0ModulePattern(), lr, md);
-    TString sname = GeometryTGeo::composeSymNameModule(lr, st, hst, md);
-
-    LOG(DEBUG) << "Add " << sname << " <-> " << path;
-
-    if (!gGeoManager->SetAlignableEntry(sname.Data(), path.Data())) {
-      LOG(FATAL) << "Unable to set alignable entry ! " << sname << " : " << path;
-    }
-  }
-
-  const V3Layer* lrobj = mGeometry[lr];
-  Int_t nchips = lrobj->getNumberOfChipsPerParent();
-  for (Int_t ic = 0; ic < nchips; ic++) {
-    addAlignableVolumesChip(lr, st, hst, md, ic, path, lastUID);
-  }
-
-  return;
-}
-
-void Detector::addAlignableVolumesChip(Int_t lr, Int_t st, Int_t hst, Int_t md, Int_t ch, TString& parent,
-                                       Int_t& lastUID) const
-{
-  //
-  // Add alignable volumes for a Chip
-  //
-  // Created:      06 Mar 2018  Mario Sitta First version (mainly ported from AliRoot)
-  //
-
-  TString path = Form("%s/%s%d_%d", parent.Data(), GeometryTGeo::getEC0ChipPattern(), lr, ch);
-  TString sname = GeometryTGeo::composeSymNameChip(lr, st, hst, md, ch);
-  Int_t modUID = chipVolUID(lastUID++);
-
-  LOG(DEBUG) << "Add " << sname << " <-> " << path;
-
-  if (!gGeoManager->SetAlignableEntry(sname, path.Data(), modUID)) {
-    LOG(FATAL) << "Unable to set alignable entry ! " << sname << " : " << path;
-  }
 
   return;
 }
@@ -1205,13 +497,6 @@ void Detector::defineSensitiveVolumes()
   TGeoVolume* v;
 
   TString volumeName;
-
-  // The names of the EC0 sensitive volumes have the format: EC0USensor(0...sNumberLayers-1)
-  for (Int_t j = 0; j < sNumberLayers; j++) {
-    volumeName = GeometryTGeo::getEC0SensorPattern() + TString::Itoa(j, 10);
-    v = geoManager->GetVolume(volumeName.Data());
-    AddSensitiveVolume(v);
-  }
 }
 
 Hit* Detector::addHit(int trackID, int detID, const TVector3& startPos, const TVector3& endPos,

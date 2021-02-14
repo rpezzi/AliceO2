@@ -753,7 +753,7 @@ void O2HitMerger::initDetInstances()
     if (i == DetID::EC0) {
       mDetectorInstances[i] = std::move(std::make_unique<o2::ecl::Detector>(true));
       counter++;
-    }  
+    }
 #endif
     // init the detector specific output files
     initHitTreeAndOutFile(i);

@@ -193,6 +193,7 @@ void build_geometry(FairRunSim* run = nullptr)
     // ALICE 3 TRK
     auto trk = new o2::trk::Detector(true);
     run->AddModule(trk);
+  }
 
   if (isActivated("EC0")) {
     // EC0

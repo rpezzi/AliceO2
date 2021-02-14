@@ -44,7 +44,6 @@ using namespace TMath;
 using namespace o2::ecl;
 using namespace o2::detectors;
 
-
 ClassImp(o2::ecl::GeometryTGeo);
 
 std::unique_ptr<o2::ecl::GeometryTGeo> GeometryTGeo::sInstance;
@@ -81,4 +80,12 @@ void GeometryTGeo::Build(int loadTrans)
     LOG(FATAL) << "Geometry is not loaded";
   }
 
+  fillMatrixCache(loadTrans);
+}
+
+//__________________________________________________________________________
+void GeometryTGeo::fillMatrixCache(int mask)
+{
+  // populate matrix cache for requested transformations
+  //
 }

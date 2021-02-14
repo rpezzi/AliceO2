@@ -15,9 +15,7 @@
 #pragma link off all functions;
 
 #pragma link C++ class o2::ecl::V11Geometry + ;
-#pragma link C++ class o2::ecl::V1Layer + ;
 #pragma link C++ class o2::ecl::V3Layer + ;
-#pragma link C++ class o2::ecl::V3Services + ;
 #pragma link C++ class o2::ecl::Detector + ;
 #pragma link C++ class o2::base::DetImpl < o2::ecl::Detector> + ;
 

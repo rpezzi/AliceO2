@@ -10,10 +10,8 @@
 
 o2_add_library(EC0Simulation
                SOURCES src/V11Geometry.cxx
-                       src/V1Layer.cxx
                        src/V3Layer.cxx
                        src/Detector.cxx
-                       src/V3Services.cxx
                PUBLIC_LINK_LIBRARIES O2::ECLayersBase
                                      O2::EndCapsSimulation
                                      O2::EndCapsBase
@@ -21,7 +19,5 @@ o2_add_library(EC0Simulation
 
 o2_target_root_dictionary(EC0Simulation
                           HEADERS include/EC0Simulation/Detector.h
-                                  include/EC0Simulation/V1Layer.h
                                   include/EC0Simulation/V3Layer.h
-                                  include/EC0Simulation/V11Geometry.h
-                                  include/EC0Simulation/V3Services.h)
+                                  include/EC0Simulation/V11Geometry.h)
