@@ -87,6 +87,8 @@ class GeometryTGeo : public o2::itsmft::GeometryTGeo
   void Build(int loadTrans = 0) override;
 
   void Print(Option_t* opt = "") const;
+  static const char* getEC0VolPattern() { return sVolumeName.c_str(); }
+  static const char* getEC0SensorPattern() { return sSensorName.c_str(); }
 
  protected:
   static constexpr int MAXLAYERS = 15; ///< max number of active layers
@@ -94,6 +96,7 @@ class GeometryTGeo : public o2::itsmft::GeometryTGeo
   Int_t mNumberOfLayers;          ///< number of layers
   static std::string sVolumeName; ///< Mother volume name
   static std::string sLayerName;  ///< Layer name
+  static std::string sSensorName; ///< Sensor name
 
  private:
   static std::unique_ptr<o2::ec0::GeometryTGeo> sInstance; ///< singletone instance

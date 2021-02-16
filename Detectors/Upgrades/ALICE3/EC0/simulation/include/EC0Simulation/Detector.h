@@ -56,9 +56,6 @@ class EC0Layer;
 class Detector : public o2::base::DetImpl<Detector>
 {
  public:
-  static constexpr Int_t sNumberLayers = 7;      ///< Number of layers in ITSU
-  static constexpr Int_t sNumberInnerLayers = 3; ///< Number of inner layers in ITSU
-
   /// Name : Detector Name
   /// Active: kTRUE for active detectors (ProcessHits() will be called)
   ///         kFALSE for inactive detectors
@@ -119,13 +116,14 @@ class Detector : public o2::base::DetImpl<Detector>
   void Read(std::istream* is);
 
   /// Returns the number of layers
-  Int_t getNumberOfLayers() const { return sNumberLayers; }
+  Int_t getNumberOfLayers() const { return mNumberOfLayers; }
 
   GeometryTGeo* mGeometryTGeo; //! access to geometry details
 
  protected:
-  Int_t mLayerID[sNumberLayers];     //! [sNumberLayers] layer identifier
-  TString mLayerName[sNumberLayers]; //! [sNumberLayers] layer identifier
+  std::vector<Int_t> mLayerID;
+  std::vector<TString> mLayerName;
+  Int_t mNumberOfLayers;
 
  private:
   /// this is transient data about track passing the sensor
@@ -153,7 +151,7 @@ class Detector : public o2::base::DetImpl<Detector>
 
   Detector& operator=(const Detector&);
 
-  EC0Layer* mGeometry[sNumberLayers]; //! Geometry
+  std::vector<EC0Layer> mLayers;
 
   template <typename Det>
   friend class o2::base::DetImpl;

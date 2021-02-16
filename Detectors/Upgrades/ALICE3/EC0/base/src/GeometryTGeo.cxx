@@ -48,8 +48,9 @@ ClassImp(o2::ec0::GeometryTGeo);
 
 std::unique_ptr<o2::ec0::GeometryTGeo> GeometryTGeo::sInstance;
 
-std::string GeometryTGeo::sVolumeName = "EC0V";     ///< Mother volume name
-std::string GeometryTGeo::sLayerName = "EC0ULayer"; ///< Layer name
+std::string GeometryTGeo::sVolumeName = "EC0V";      ///< Mother volume name
+std::string GeometryTGeo::sLayerName = "EC0Layer";   ///< Layer name
+std::string GeometryTGeo::sSensorName = "EC0Sensor"; ///< Sensor name
 
 //__________________________________________________________________________
 GeometryTGeo::GeometryTGeo(bool build, int loadTrans) : o2::itsmft::GeometryTGeo(DetID::EC0)

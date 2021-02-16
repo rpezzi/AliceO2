@@ -29,9 +29,12 @@ namespace ec0
 /// to study different configurations during the development of the ALICE3 EndCaps
 class EC0Layer : public TObject
 {
-
+ public:
   // Default constructor
   EC0Layer();
+
+  // Sample layer constructor
+  EC0Layer(Int_t layerNumber, std::string layerName, Float_t eta_in, Float_t eta_out, Float_t z, Float_t passive_x2X0);
 
   /// Copy constructor
   EC0Layer(const EC0Layer&) = default;
@@ -47,13 +50,14 @@ class EC0Layer : public TObject
   virtual void createLayer(TGeoVolume* motherVolume);
 
  private:
-  Int_t mLayerNumber;        ///< Current layer number
+  Int_t mLayerNumber = -1; ///< Current layer number
+  std::string mLayerName;
   Double_t mInnerRadius;     ///< Inner radius of this layer
   Double_t mOuterRadius;     ///< Outer radius of this layer
   Double_t mZ;               ///< Z position of the layer
   Double_t mSensorThickness; ///< Sensor thickness
   Double_t mChipThickness;   ///< Chip thickness
-  Double_t mPassive_x2X0;    ///< Passaive material thickness (x/X0)
+  Double_t mPassive_x2X0;    ///< Passive material thickness (x/X0)
 
   ClassDefOverride(EC0Layer, 0); // ALICE 3 EndCaps geometry
 };

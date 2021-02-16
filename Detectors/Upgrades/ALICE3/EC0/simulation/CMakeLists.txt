@@ -18,3 +18,5 @@ o2_add_library(EC0Simulation
 o2_target_root_dictionary(EC0Simulation
                           HEADERS include/EC0Simulation/Detector.h
                                   include/EC0Simulation/EC0Layer.h)
+
+o2_data_file(COPY data  DESTINATION Detectors/EC0/simulation)
