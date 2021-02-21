@@ -99,6 +99,11 @@ class Detector : public o2::base::DetImpl<Detector>
 
   /// Add alignable top volumes
   void addAlignableVolumes() const override;
+  void addAlignableVolumesLayer(Int_t lr, TString& parent, Int_t& lastUID) const;
+  void addAlignableVolumesChip(Int_t lr, TString& parent, Int_t& lastUID) const;
+  void addAlignableVolumesSensor(Int_t lr, TString& parent, Int_t& lastUID) const;
+
+  Int_t chipVolUID(Int_t id) const { return o2::base::GeometryManager::getSensID(o2::detectors::DetID::EC0, id); }
 
   void EndOfEvent() override;
 
@@ -141,8 +146,8 @@ class Detector : public o2::base::DetImpl<Detector>
   /// Create the detector materials
   virtual void createMaterials();
 
-  /// Construct the detector geometry
-  void constructDetectorGeometry();
+  /// Create the detector geometry
+  void createGeometry();
 
   /// Define the sensitive volumes of the geometry
   void defineSensitiveVolumes();

@@ -62,8 +62,10 @@ void EC0Layer::createLayer(TGeoVolume* motherVolume)
   if (mLayerNumber >= 0) {
     // Create tube, set sensitive volume, add to mother volume
 
-    std::string chipName = "EC0Chip_" + std::to_string(mLayerNumber),
+    std::string chipName = o2::ec0::GeometryTGeo::getEC0ChipPattern() + std::to_string(mLayerNumber),
                 sensName = o2::ec0::GeometryTGeo::getEC0SensorPattern() + std::to_string(mLayerNumber);
+
+    LOG(INFO) << "Naming Si Sensor (to be active) " << sensName;
 
     TGeoTube* sensor = new TGeoTube(mInnerRadius, mOuterRadius, mSensorThickness / 2);
     TGeoTube* chip = new TGeoTube(mInnerRadius, mOuterRadius, mChipThickness / 2);
@@ -80,7 +82,7 @@ void EC0Layer::createLayer(TGeoVolume* motherVolume)
     chipVol->AddNode(sensVol, 1, nullptr);
 
     LOG(INFO) << "Inserting " << chipVol->GetName() << " inside " << layerVol->GetName();
-    layerVol->AddNode(chipVol, 0, nullptr);
+    layerVol->AddNode(chipVol, 1, nullptr);
 
     // Finally put everything in the mother volume
     auto* FwdDiskRotation = new TGeoRotation("FwdDiskRotation", 0, 0, 180);

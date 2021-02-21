@@ -71,6 +71,26 @@ Detector::Detector(Bool_t active)
     mHits(o2::utils::createSimVector<o2::itsmft::Hit>())
 {
 
+  // Basic Endcaps configuration
+  mNumberOfLayers = 8;
+  Float_t z_first = -30.0;
+  Float_t z_length = -100;
+  Float_t etaIn = -4.5;
+  Float_t etaOut = -1.5;
+  Float_t x2X0 = 0.0002;
+
+  mLayerName.resize(mNumberOfLayers);
+  mLayerID.resize(mNumberOfLayers);
+
+  for (int layerNumber = 0; layerNumber < mNumberOfLayers; layerNumber++) {
+    std::string layerName = GeometryTGeo::getEC0LayerPattern() + std::to_string(layerNumber);
+    mLayerName[layerNumber] = layerName;
+
+    // Adds evenly spaced layers
+    Float_t layerZ = z_first + layerNumber * z_length / (mNumberOfLayers - 1);
+    auto& thisLayer = mLayers.emplace_back(layerNumber, layerName, etaIn, etaOut, layerZ, x2X0);
+  }
+
   configEC0(this);
 }
 
@@ -118,6 +138,8 @@ Detector& Detector::operator=(const Detector& rhs)
   mLayerID = rhs.mLayerID;
   mLayerName = rhs.mLayerName;
   mNumberOfLayers = rhs.mNumberOfLayers;
+  mLayers = rhs.mLayers;
+  mTrackData = rhs.mTrackData;
 
   /// Container for data points
   mHits = nullptr;
@@ -131,28 +153,27 @@ void Detector::InitializeO2Detector()
   // Define the list of sensitive volumes
   LOG(INFO) << "Initialize EC0 O2Detector";
 
-  defineSensitiveVolumes();
-  for (int i = 0; i < mNumberOfLayers; i++) {
-    mLayerID[i] = gMC ? TVirtualMC::GetMC()->VolId(mLayerName[i]) : 0;
-    LOG(INFO) << "mLayerID for layer " << i << " = " << mLayerID[i];
-  }
-
   mGeometryTGeo = GeometryTGeo::Instance();
+
+  defineSensitiveVolumes();
+
 }
 
 //_________________________________________________________________________________________________
 Bool_t Detector::ProcessHits(FairVolume* vol)
 {
+
+  LOG(INFO) << "Processing EC0 Hit!";
+
   // This method is called from the MC stepping
   if (!(fMC->TrackCharge())) {
     return kFALSE;
   }
-
   Int_t lay = 0, volID = vol->getMCid();
 
   // FIXME: Determine the layer number. Is this information available directly from the FairVolume?
   bool notSens = false;
-  while ((lay < mNumberOfLayers) && (notSens = (volID != mLayerID[lay]))) {
+  while ((lay < mNumberOfLayers) && ((volID != mLayerID[lay]))) {
     ++lay;
   }
   if (notSens) {
@@ -161,13 +182,13 @@ Bool_t Detector::ProcessHits(FairVolume* vol)
 
   // Is it needed to keep a track reference when the outer EC0 volume is encountered?
   auto stack = (o2::data::Stack*)fMC->GetStack();
-  if (fMC->IsTrackExiting() && (lay == 0 || lay == 6)) {
-    // Keep the track refs for the innermost and outermost layers only
-    o2::TrackReference tr(*fMC, GetDetId());
-    tr.setTrackID(stack->GetCurrentTrackNumber());
-    tr.setUserId(lay);
-    stack->addTrackReference(tr);
-  }
+  //if (fMC->IsTrackExiting() && (lay == 0 || lay == 6)) {
+  //  // Keep the track refs for the innermost and outermost layers only
+  //  o2::TrackReference tr(*fMC, GetDetId());
+  //  tr.setTrackID(stack->GetCurrentTrackNumber());
+  //  tr.setUserId(lay);
+  //  stack->addTrackReference(tr);
+  //}
   bool startHit = false, stopHit = false;
   unsigned char status = 0;
   if (fMC->IsTrackEntering()) {
@@ -213,7 +234,6 @@ Bool_t Detector::ProcessHits(FairVolume* vol)
     TLorentzVector positionStop;
     fMC->TrackPosition(positionStop);
     // Retrieve the indices with the volume path
-    int stave(0), halfstave(0), chipinmodule(0), module(0);
     int chipindex = lay;
 
     Hit* p = addHit(stack->GetCurrentTrackNumber(), chipindex, mTrackData.mPositionStart.Vect(), positionStop.Vect(),
@@ -291,54 +311,115 @@ void Detector::ConstructGeometry()
   createMaterials();
 
   // Construct the detector geometry
-  constructDetectorGeometry();
+  createGeometry();
 }
 
 //_________________________________________________________________________________________________
-void Detector::constructDetectorGeometry()
+void Detector::createGeometry()
 {
-  // Basic Endcaps configuration
-  mNumberOfLayers = 8;
-  Float_t z_first = -30.0;
-  Float_t z_length = -100;
-  Float_t etaIn = -4.5;
-  Float_t etaOut = -1.5;
-  Float_t x2X0 = 0.0002;
 
-  // Create the geometry and insert it in the mother volume EC0V
-  TGeoManager* geoManager = gGeoManager;
+  mGeometryTGeo = GeometryTGeo::Instance();
 
-  TGeoVolume* vALIC = geoManager->GetVolume("barrel");
+  TGeoVolume* volEC0 = new TGeoVolumeAssembly(GeometryTGeo::getEC0VolPattern());
 
+  LOG(INFO) << "GeometryBuilder::buildGeometry volume name = " << GeometryTGeo::getEC0VolPattern();
+
+  TGeoVolume* vALIC = gGeoManager->GetVolume("barrel");
   if (!vALIC) {
     LOG(FATAL) << "Could not find the top volume";
   }
 
-  new TGeoVolumeAssembly(GeometryTGeo::getEC0VolPattern());
-  TGeoVolume* vEC0 = geoManager->GetVolume(GeometryTGeo::getEC0VolPattern());
-  vALIC->AddNode(vEC0, 2, new TGeoTranslation(0, 30., 0)); // Copy number is 2 to cheat AliGeoManager::CheckSymNamesLUT
+  LOG(DEBUG) << "buildGeometry: "
+             << Form("gGeoManager name is %s title is %s", gGeoManager->GetName(), gGeoManager->GetTitle());
 
-  const Int_t kLength = 100;
-  Char_t vstrng[kLength] = "xxxRS";
-  vEC0->SetTitle(vstrng);
+  for (int iLayer = 0; iLayer < mNumberOfLayers; iLayer++) {
+    mLayers[iLayer].createLayer(volEC0);
+  }
 
-  mLayerName.resize(mNumberOfLayers);
-  mLayerID.resize(mNumberOfLayers);
+  vALIC->AddNode(volEC0, 2, new TGeoTranslation(0., 30., 0.));
 
-  for (int layerNumber = 0; layerNumber < mNumberOfLayers; layerNumber++) {
-    std::string layerName = "EC0Layer_" + std::to_string(layerNumber);
-    mLayerName[layerNumber] = layerName;
-
-    // Adds evenly spaced layers
-    Float_t layerZ = z_first + layerNumber * z_length / (mNumberOfLayers - 1);
-    auto& thisLayer = mLayers.emplace_back(layerNumber, layerName, etaIn, etaOut, layerZ, x2X0);
-    thisLayer.createLayer(vEC0);
+  for (int iLayer = 0; iLayer < mNumberOfLayers; iLayer++) {
+    mLayerID[iLayer] = gMC ? TVirtualMC::GetMC()->VolId(mLayerName[iLayer]) : 0;
+    LOG(INFO) << "mLayerID for layer " << iLayer << " = " << mLayerID[iLayer];
   }
 }
 
 //_________________________________________________________________________________________________
 void Detector::addAlignableVolumes() const
 {
+  LOG(INFO) << "Add EC0 alignable volumes";
+
+  if (!gGeoManager) {
+    LOG(FATAL) << "TGeoManager doesn't exist !";
+    return;
+  }
+
+  TString path = Form("/cave_1/barrel_1/%s_2", GeometryTGeo::getEC0VolPattern());
+  TString sname = GeometryTGeo::composeSymNameEC0();
+
+  LOG(DEBUG) << sname << " <-> " << path;
+
+  if (!gGeoManager->SetAlignableEntry(sname.Data(), path.Data())) {
+    LOG(FATAL) << "Unable to set alignable entry ! " << sname << " : " << path;
+  }
+
+  Int_t lastUID = 0;
+  for (Int_t lr = 0; lr < mNumberOfLayers; lr++) {
+    addAlignableVolumesLayer(lr, path, lastUID);
+  }
+
+  return;
+}
+
+//_________________________________________________________________________________________________
+void Detector::addAlignableVolumesLayer(int lr, TString& parent, Int_t& lastUID) const
+{
+
+  TString path = Form("%s/%s%d_1", parent.Data(), GeometryTGeo::getEC0LayerPattern(), lr);
+
+  TString sname = GeometryTGeo::composeSymNameLayer(lr);
+
+  LOG(DEBUG) << "Add " << sname << " <-> " << path;
+
+  if (!gGeoManager->SetAlignableEntry(sname, path.Data())) {
+    LOG(FATAL) << "Unable to set alignable entry ! " << sname << " : " << path;
+  }
+  addAlignableVolumesChip(lr, path, lastUID);
+  return;
+}
+
+//_________________________________________________________________________________________________
+void Detector::addAlignableVolumesChip(int lr, TString& parent, Int_t& lastUID) const
+{
+
+  TString path = Form("%s/%s%d_1", parent.Data(), GeometryTGeo::getEC0ChipPattern(), lr);
+
+  TString sname = GeometryTGeo::composeSymNameChip(lr);
+  Int_t modUID = chipVolUID(lastUID++);
+
+  LOG(DEBUG) << "Add " << sname << " <-> " << path;
+
+  if (!gGeoManager->SetAlignableEntry(sname, path.Data(), modUID)) {
+    LOG(FATAL) << "Unable to set alignable entry ! " << sname << " : " << path;
+  }
+  //addAlignableVolumesSensor(lr, path, lastUID);
+  return;
+}
+
+//_________________________________________________________________________________________________
+void Detector::addAlignableVolumesSensor(int lr, TString& parent, Int_t& lastUID) const
+{
+
+  TString path = Form("%s/%s%d_1", parent.Data(), GeometryTGeo::getEC0SensorPattern(), lr);
+
+  TString sname = GeometryTGeo::composeSymNameSensor(lr);
+  Int_t modUID = chipVolUID(lastUID++);
+
+  LOG(DEBUG) << "Add " << sname << " <-> " << path;
+
+  if (!gGeoManager->SetAlignableEntry(sname, path.Data(), modUID)) {
+    LOG(FATAL) << "Unable to set alignable entry ! " << sname << " : " << path;
+  }
 
   return;
 }
@@ -351,7 +432,7 @@ void Detector::defineSensitiveVolumes()
 
   TString volumeName;
 
-  // The names of the EC0 sensitive volumes have the format: EC0Sensor_ITSUSensor(0...sNumberLayers-1)
+  // The names of the EC0 sensitive volumes have the format: EC0Sensor(0...sNumberLayers-1)
   for (Int_t j = 0; j < mNumberOfLayers; j++) {
     volumeName = o2::ec0::GeometryTGeo::getEC0SensorPattern() + std::to_string(j);
     v = geoManager->GetVolume(volumeName.Data());

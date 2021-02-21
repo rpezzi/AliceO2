@@ -50,6 +50,7 @@ std::unique_ptr<o2::ec0::GeometryTGeo> GeometryTGeo::sInstance;
 
 std::string GeometryTGeo::sVolumeName = "EC0V";      ///< Mother volume name
 std::string GeometryTGeo::sLayerName = "EC0Layer";   ///< Layer name
+std::string GeometryTGeo::sChipName = "EC0Chip";     ///< Sensor name
 std::string GeometryTGeo::sSensorName = "EC0Sensor"; ///< Sensor name
 
 //__________________________________________________________________________
@@ -81,6 +82,24 @@ void GeometryTGeo::Build(int loadTrans)
   }
 
   fillMatrixCache(loadTrans);
+}
+
+//__________________________________________________________________________
+const char* GeometryTGeo::composeSymNameLayer(int lr)
+{
+  return Form("%s/%s%d", composeSymNameEC0(), getEC0LayerPattern(), lr);
+}
+
+//__________________________________________________________________________
+const char* GeometryTGeo::composeSymNameChip(int lr)
+{
+  return Form("%s/%s%d", composeSymNameLayer(lr), getEC0ChipPattern(), lr);
+}
+
+//__________________________________________________________________________
+const char* GeometryTGeo::composeSymNameSensor(int lr)
+{
+  return Form("%s/%s%d", composeSymNameLayer(lr), getEC0SensorPattern(), lr);
 }
 
 //__________________________________________________________________________

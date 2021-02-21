@@ -88,7 +88,14 @@ class GeometryTGeo : public o2::itsmft::GeometryTGeo
 
   void Print(Option_t* opt = "") const;
   static const char* getEC0VolPattern() { return sVolumeName.c_str(); }
+  static const char* getEC0LayerPattern() { return sLayerName.c_str(); }
+  static const char* getEC0ChipPattern() { return sChipName.c_str(); }
   static const char* getEC0SensorPattern() { return sSensorName.c_str(); }
+
+  static const char* composeSymNameEC0() { return o2::detectors::DetID(o2::detectors::DetID::EC0).getName(); }
+  static const char* composeSymNameLayer(int lr);
+  static const char* composeSymNameChip(int lr);
+  static const char* composeSymNameSensor(int lr);
 
  protected:
   static constexpr int MAXLAYERS = 15; ///< max number of active layers
@@ -96,6 +103,8 @@ class GeometryTGeo : public o2::itsmft::GeometryTGeo
   Int_t mNumberOfLayers;          ///< number of layers
   static std::string sVolumeName; ///< Mother volume name
   static std::string sLayerName;  ///< Layer name
+  static std::string sChipName;   ///< Chip name
+
   static std::string sSensorName; ///< Sensor name
 
  private:
