@@ -43,18 +43,26 @@ EC0Layer::EC0Layer()
 
 EC0Layer::~EC0Layer() = default;
 
-EC0Layer::EC0Layer(Int_t layerNumber, std::string layerName, Float_t eta_in, Float_t eta_out, Float_t z, Float_t passive_x2X0)
+EC0Layer::EC0Layer(Int_t layerNumber, std::string layerName, Float_t z, Float_t rIn, Float_t rOut, Float_t sensorThickness, Float_t Layerx2X0)
 {
   // Creates a simple parametrized EndCap layer covering the given
   // pseudorapidity range at the z layer position
   mLayerNumber = layerNumber;
   mLayerName = layerName;
   mZ = z;
-  mPassive_x2X0 = passive_x2X0;
-  mSensorThickness = 50 * 1.0E-4; // Micron
-  mInnerRadius = std::abs(mZ * std::tan(2.f * std::atan(std::exp(-eta_in))));
-  mOuterRadius = std::abs(mZ * std::tan(2.f * std::atan(std::exp(-eta_out))));
-  mChipThickness = passive_x2X0; // TODO: calculate ChipThickness to match x/X0
+  mx2X0 = Layerx2X0;
+  mSensorThickness = sensorThickness;
+  mInnerRadius = rIn;
+  mOuterRadius = rOut;
+
+  LOG(INFO) << " Using silicon Radiation Length =  " << 9.5 << " to emulate layer radiation length.";
+
+  mChipThickness = Layerx2X0 * 9.5;
+  if (mChipThickness < mSensorThickness) {
+    LOG(INFO) << " WARNING: Chip cannot be thinner than sensor. Setting minimal chip thickness.";
+    mChipThickness = mSensorThickness;
+  }
+  LOG(INFO) << "Creating EC0 Layer " << mLayerNumber << ": z = " << mZ << " ; R_in = " << mInnerRadius << " ; R_out = " << mOuterRadius << " ; ChipThickness = " << mChipThickness;
 }
 
 void EC0Layer::createLayer(TGeoVolume* motherVolume)
@@ -65,8 +73,6 @@ void EC0Layer::createLayer(TGeoVolume* motherVolume)
     std::string chipName = o2::ec0::GeometryTGeo::getEC0ChipPattern() + std::to_string(mLayerNumber),
                 sensName = o2::ec0::GeometryTGeo::getEC0SensorPattern() + std::to_string(mLayerNumber);
 
-    LOG(INFO) << "Naming Si Sensor (to be active) " << sensName;
-
     TGeoTube* sensor = new TGeoTube(mInnerRadius, mOuterRadius, mSensorThickness / 2);
     TGeoTube* chip = new TGeoTube(mInnerRadius, mOuterRadius, mChipThickness / 2);
     TGeoTube* layer = new TGeoTube(mInnerRadius, mOuterRadius, mChipThickness / 2);
@@ -75,7 +81,7 @@ void EC0Layer::createLayer(TGeoVolume* motherVolume)
     TGeoMedium* medAir = gGeoManager->GetMedium("EC0_AIR$");
 
     TGeoVolume* sensVol = new TGeoVolume(sensName.c_str(), sensor, medSi);
-    TGeoVolume* chipVol = new TGeoVolume(chipName.c_str(), chip, medAir);
+    TGeoVolume* chipVol = new TGeoVolume(chipName.c_str(), chip, medSi);
     TGeoVolume* layerVol = new TGeoVolume(mLayerName.c_str(), layer, medAir);
 
     LOG(INFO) << "Inserting " << sensVol->GetName() << " inside " << chipVol->GetName();

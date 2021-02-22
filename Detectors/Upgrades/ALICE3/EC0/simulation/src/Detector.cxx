@@ -59,9 +59,65 @@ Detector::Detector()
 }
 
 //_________________________________________________________________________________________________
-static void configEC0(Detector* ec0)
+void Detector::buildBasicEC0(int nLayers, Float_t z_first, Float_t z_length, Float_t etaIn, Float_t etaOut, Float_t Layerx2X0)
 {
-  // build EC0 upgrade detector
+  // Build a basic parametrized EC0 detector with nLayers equally spaced between z_first and z_first+z_length
+  // Covering pseudo rapidity [etaIn,etaOut]. Passive silicon thinkness computed to match layer x/X0
+
+  mNumberOfLayers = nLayers;
+  Float_t sensorThickness = 30.e-4;
+  mLayerName.resize(mNumberOfLayers);
+  mLayerID.resize(mNumberOfLayers);
+
+  for (int layerNumber = 0; layerNumber < mNumberOfLayers; layerNumber++) {
+    std::string layerName = GeometryTGeo::getEC0LayerPattern() + std::to_string(layerNumber);
+    mLayerName[layerNumber] = layerName;
+
+    // Adds evenly spaced layers
+    Float_t layerZ = z_first + (layerNumber * z_length / (mNumberOfLayers - 1)) * std::copysign(1, z_first);
+    Float_t rIn = std::abs(layerZ * std::tan(2.f * std::atan(std::exp(-etaIn))));
+    Float_t rOut = std::abs(layerZ * std::tan(2.f * std::atan(std::exp(-etaOut))));
+
+    auto& thisLayer = mLayers.emplace_back(layerNumber, layerName, layerZ, rIn, rOut, sensorThickness, Layerx2X0);
+  }
+}
+
+//_________________________________________________________________________________________________
+void Detector::buildEC0V1()
+{
+  //Build EC0 detector according to
+  //https://indico.cern.ch/event/992488/contributions/4174473/attachments/2168881/3661331/tracker_parameters_werner_jan_11_2021.pdf
+
+  mNumberOfLayers = 10;
+  Float_t sensorThickness = 30.e-4;
+  Float_t layersx2X0 = 1.e-2;
+  std::vector<std::array<Float_t, 5>> layersConfig{
+    {-16., .5, 3., sensorThickness, 0.1f * layersx2X0}, // {z_layer, r_in, r_out, sensor_thickness, Layerx2X0}
+    {-20., .5, 3., sensorThickness, 0.1f * layersx2X0},
+    {-24., .5, 3., sensorThickness, 0.1f * layersx2X0},
+    {-77., 3.5, 35., sensorThickness, layersx2X0},
+    {-100., 3.5, 35., sensorThickness, layersx2X0},
+    {-122., 3.5, 35., sensorThickness, layersx2X0},
+    {-150., 3.5, 100., sensorThickness, layersx2X0},
+    {-180., 3.5, 100., sensorThickness, layersx2X0},
+    {-220., 3.5, 100., sensorThickness, layersx2X0},
+    {-279., 3.5, 100., sensorThickness, layersx2X0}};
+
+  mLayerName.resize(mNumberOfLayers);
+  mLayerID.resize(mNumberOfLayers);
+
+  for (int layerNumber = 0; layerNumber < mNumberOfLayers; layerNumber++) {
+    std::string layerName = GeometryTGeo::getEC0LayerPattern() + std::to_string(layerNumber);
+    mLayerName[layerNumber] = layerName;
+    auto& z = layersConfig[layerNumber][0];
+    auto& rIn = layersConfig[layerNumber][1];
+    auto& rOut = layersConfig[layerNumber][2];
+    auto& thickness = layersConfig[layerNumber][3];
+    auto& x0 = layersConfig[layerNumber][4];
+
+    // Adds evenly spaced layers
+    auto& thisLayer = mLayers.emplace_back(layerNumber, layerName, z, rIn, rOut, thickness, x0);
+  }
 }
 
 //_________________________________________________________________________________________________
@@ -71,27 +127,8 @@ Detector::Detector(Bool_t active)
     mHits(o2::utils::createSimVector<o2::itsmft::Hit>())
 {
 
-  // Basic Endcaps configuration
-  mNumberOfLayers = 8;
-  Float_t z_first = -30.0;
-  Float_t z_length = -100;
-  Float_t etaIn = -4.5;
-  Float_t etaOut = -1.5;
-  Float_t x2X0 = 0.0002;
-
-  mLayerName.resize(mNumberOfLayers);
-  mLayerID.resize(mNumberOfLayers);
-
-  for (int layerNumber = 0; layerNumber < mNumberOfLayers; layerNumber++) {
-    std::string layerName = GeometryTGeo::getEC0LayerPattern() + std::to_string(layerNumber);
-    mLayerName[layerNumber] = layerName;
-
-    // Adds evenly spaced layers
-    Float_t layerZ = z_first + layerNumber * z_length / (mNumberOfLayers - 1);
-    auto& thisLayer = mLayers.emplace_back(layerNumber, layerName, etaIn, etaOut, layerZ, x2X0);
-  }
-
-  configEC0(this);
+  //buildBasicEC0(); // BasicEC0 = Parametrized detector equidistant layers
+  buildEC0V1(); // EC0V1 = Werner's layout
 }
 
 //_________________________________________________________________________________________________
@@ -162,33 +199,18 @@ void Detector::InitializeO2Detector()
 //_________________________________________________________________________________________________
 Bool_t Detector::ProcessHits(FairVolume* vol)
 {
-
-  LOG(INFO) << "Processing EC0 Hit!";
-
   // This method is called from the MC stepping
   if (!(fMC->TrackCharge())) {
     return kFALSE;
   }
-  Int_t lay = 0, volID = vol->getMCid();
 
-  // FIXME: Determine the layer number. Is this information available directly from the FairVolume?
-  bool notSens = false;
-  while ((lay < mNumberOfLayers) && ((volID != mLayerID[lay]))) {
+  Int_t lay = 0, volID = vol->getMCid();
+  while ((lay <= mNumberOfLayers) && (volID != mLayerID[lay])) {
     ++lay;
   }
-  if (notSens) {
-    return kFALSE; // RS: can this happen? This method must be called for sensors only?
-  }
 
-  // Is it needed to keep a track reference when the outer EC0 volume is encountered?
   auto stack = (o2::data::Stack*)fMC->GetStack();
-  //if (fMC->IsTrackExiting() && (lay == 0 || lay == 6)) {
-  //  // Keep the track refs for the innermost and outermost layers only
-  //  o2::TrackReference tr(*fMC, GetDetId());
-  //  tr.setTrackID(stack->GetCurrentTrackNumber());
-  //  tr.setUserId(lay);
-  //  stack->addTrackReference(tr);
-  //}
+
   bool startHit = false, stopHit = false;
   unsigned char status = 0;
   if (fMC->IsTrackEntering()) {
@@ -339,7 +361,7 @@ void Detector::createGeometry()
   vALIC->AddNode(volEC0, 2, new TGeoTranslation(0., 30., 0.));
 
   for (int iLayer = 0; iLayer < mNumberOfLayers; iLayer++) {
-    mLayerID[iLayer] = gMC ? TVirtualMC::GetMC()->VolId(mLayerName[iLayer]) : 0;
+    mLayerID[iLayer] = gMC ? TVirtualMC::GetMC()->VolId(Form("%s%d", GeometryTGeo::getEC0SensorPattern(), iLayer)) : 0;
     LOG(INFO) << "mLayerID for layer " << iLayer << " = " << mLayerID[iLayer];
   }
 }

@@ -123,6 +123,9 @@ class Detector : public o2::base::DetImpl<Detector>
   /// Returns the number of layers
   Int_t getNumberOfLayers() const { return mNumberOfLayers; }
 
+  void buildBasicEC0(int nLayers = 10, Float_t z_first = -16.0, Float_t z_length = 263, Float_t etaIn = -4.5, Float_t etaOut = -1.5, Float_t Layerx2X0 = 0.01);
+  void buildEC0V1();
+
   GeometryTGeo* mGeometryTGeo; //! access to geometry details
 
  protected:
